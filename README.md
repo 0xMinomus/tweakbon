@@ -32,6 +32,7 @@ Templates are supplied by the user on the left pane. A template may be a transpa
 
 - **Still Templates**: The app scans the alpha channel, identifies the largest contiguous transparent region, and derives the slot rectangle from its bounding box.
 - **Video Templates**: The slot is detected once from frame 0 and held constant for the entire duration of the clip. The transparent region in the video must not move relative to the frame; otherwise the slot mask drifts away from the stationary photo beneath.
+- **Video codec**: the container must preserve per-pixel alpha. That means **WebM (VP9)**; H.264/MP4 has no alpha channel, so a "transparent" MP4 loses its hole and is rejected as opaque.
 - **Contiguity**: Stray transparent pixels are ignored; only the largest connected transparent area defines the slot.
 - **Geometry**: Non-rectangular transparent cutouts are approximated by their axis-aligned bounding box.
 

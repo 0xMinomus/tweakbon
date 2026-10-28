@@ -102,10 +102,11 @@ flowchart LR
 2. **Decode**: Photo decodes via `createImageBitmap` respecting EXIF orientation. Image templates decode to `ImageBitmap`; video templates mount to a muted looping `<video>`.
 3. **Template Slot Detection**: The slot is detected from alpha channel data. For video templates, frame 0 is decoded and analyzed once at load time, and the resulting slot coordinates are held constant for the entire clip.
 4. **Video Template Mask Constraint**: Because the slot is sampled once at frame 0, the transparent region in a video template must remain stationary relative to the frame. If the hole moves in the video, the cutout mask drifts away from the stationary photo underneath.
-5. **Auto-fit**: Initial scale and position are computed to cover the slot while centering the photo.
-6. **Interactive Adjustment**: Pointer drag, scroll wheel, pinch, and keyboard events trigger pure transform reducers, clamped against the rotated bounding box.
-7. **Compositing**: Redraws run on `requestAnimationFrame`, filling `#FFF8EC` under uncovered photo regions and drawing the template frame on top.
-8. **Export**: The composite renders at natural resolution onto an offscreen canvas and encodes into a downloadable PNG (for still templates) or MP4 (for video templates).
+5. **Video Template Codec**: the source must carry per-pixel alpha. WebM/VP9 does; H.264/MP4 does not, so a transparent MP4 decodes as fully opaque and is rejected.
+6. **Auto-fit**: Initial scale and position are computed to cover the slot while centering the photo.
+7. **Interactive Adjustment**: Pointer drag, scroll wheel, pinch, and keyboard events trigger pure transform reducers, clamped against the rotated bounding box.
+8. **Compositing**: Redraws run on `requestAnimationFrame`, filling `#FFF8EC` under uncovered photo regions and drawing the template frame on top.
+9. **Export**: The composite renders at natural resolution onto an offscreen canvas and encodes into a downloadable PNG (for still templates) or MP4 (for video templates).
 
 ## In-Editor Template and Photo Controls
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { drawFrame, type FrameInput } from './compositor';
-import type { PhotoMedia, TemplateImage, TemplateVideo } from '../../types/media';
+import type { PhotoMedia, VideoMedia, TemplateImage, TemplateVideo } from '../../types/media';
 import type { TemplateManifest } from '../../types/template';
 import type { TransformState } from '../../types/editor';
 
@@ -76,6 +76,7 @@ const baseTemplate: TemplateImage = {
 };
 
 const baseMedia: PhotoMedia = {
+  kind: 'photo',
   source: fakeMediaSource,
   width: 800,
   height: 600,
@@ -349,5 +350,55 @@ describe('compositor drawFrame', () => {
 
     const hasFill = ctx.calls.some((c) => c.method === 'fillRect' || c.method === 'fill');
     expect(hasFill).toBe(false);
+  });
+  it('draws video user media directly when chroma key is not enabled', () => {
+    const ctx = createRecordingContext();
+    const fakeUserVideo = { readyState: 2 } as HTMLVideoElement;
+    const videoUserMedia: VideoMedia = {
+      kind: 'video',
+      source: fakeUserVideo,
+      width: 1280,
+      height: 720,
+      duration: 10,
+      release: () => {},
+    };
+    const input: FrameInput = {
+      template: baseTemplate,
+      media: videoUserMedia,
+      manifest: baseManifest,
+      transform: defaultTransform,
+    };
+
+    drawFrame(ctx, input, 500, 500);
+
+    const drawCalls = ctx.calls.filter((c) => c.method === 'drawImage');
+    expect(drawCalls).toHaveLength(2);
+    expect(drawCalls[0].args[0]).toBe(fakeUserVideo);
+    expect(drawCalls[1].args[0]).toBe(fakeTemplateSource);
+  });
+
+  it('skips video user media drawing when readyState is less than 2', () => {
+    const ctx = createRecordingContext();
+    const fakeUserVideo = { readyState: 1 } as HTMLVideoElement;
+    const videoUserMedia: VideoMedia = {
+      kind: 'video',
+      source: fakeUserVideo,
+      width: 1280,
+      height: 720,
+      duration: 10,
+      release: () => {},
+    };
+    const input: FrameInput = {
+      template: baseTemplate,
+      media: videoUserMedia,
+      manifest: baseManifest,
+      transform: defaultTransform,
+    };
+
+    drawFrame(ctx, input, 500, 500);
+
+    const drawCalls = ctx.calls.filter((c) => c.method === 'drawImage');
+    expect(drawCalls).toHaveLength(1);
+    expect(drawCalls[0].args[0]).toBe(fakeTemplateSource);
   });
 });

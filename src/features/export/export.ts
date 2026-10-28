@@ -64,7 +64,7 @@ export async function exportStill(
   });
 }
 
-export function exportMotion(input: FrameInput, durationSeconds: number): Promise<Blob> {
+export async function exportMotion(input: FrameInput, durationSeconds: number): Promise<Blob> {
   const width = input.manifest.naturalWidth || input.template.width;
   const height = input.manifest.naturalHeight || input.template.height;
 
@@ -86,15 +86,120 @@ export function exportMotion(input: FrameInput, durationSeconds: number): Promis
     ? durationSeconds
     : 15;
 
+  let trimStart = 0;
+  let trimEnd = duration;
+
+  if (input.media.kind === 'video') {
+    const userVideo = input.media.source;
+    const mediaDuration = Number.isFinite(userVideo.duration) && userVideo.duration > 0
+      ? userVideo.duration
+      : duration;
+
+    trimStart = input.trim && Number.isFinite(input.trim.start)
+      ? Math.max(0, Math.min(mediaDuration, input.trim.start))
+      : 0;
+
+    const rawEnd = input.trim && Number.isFinite(input.trim.end)
+      ? input.trim.end
+      : mediaDuration;
+
+    trimEnd = rawEnd > trimStart
+      ? Math.min(mediaDuration, rawEnd)
+      : mediaDuration;
+
+    const trimDuration = trimEnd - trimStart;
+    if (Number.isFinite(trimDuration) && trimDuration > 0) {
+      duration = Math.min(duration, trimDuration);
+    }
+  }
+
   if (input.template.kind === 'video') {
     const videoDuration = input.template.source.duration;
-    if (Number.isFinite(videoDuration) && videoDuration > 0 && videoDuration < duration) {
-      duration = videoDuration;
+    if (Number.isFinite(videoDuration) && videoDuration > 0) {
+      duration = Math.min(duration, videoDuration);
     }
   }
 
   duration = Math.min(30, Math.max(1, duration));
 
+  if (input.media.kind === 'video') {
+    const userVideo = input.media.source;
+    try {
+      if (userVideo.readyState < 2) {
+        await new Promise<void>((resolve, reject) => {
+          let timer = 0;
+          const cleanup = () => {
+            window.clearTimeout(timer);
+            userVideo.removeEventListener('loadeddata', onReady);
+            userVideo.removeEventListener('canplay', onReady);
+            userVideo.removeEventListener('error', onError);
+          };
+          const onReady = () => {
+            cleanup();
+            resolve();
+          };
+          const onError = () => {
+            cleanup();
+            reject(new Error('Gagal memuat video untuk ekspor.'));
+          };
+          timer = window.setTimeout(() => {
+            cleanup();
+            if (userVideo.readyState >= 2) {
+              resolve();
+            } else {
+              reject(new Error('Batas waktu memuat video untuk ekspor terlampaui.'));
+            }
+          }, 5000);
+          userVideo.addEventListener('loadeddata', onReady, { once: true });
+          userVideo.addEventListener('canplay', onReady, { once: true });
+          userVideo.addEventListener('error', onError, { once: true });
+        });
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        let timer = 0;
+        const cleanup = () => {
+          window.clearTimeout(timer);
+          userVideo.removeEventListener('seeked', onSeeked);
+          userVideo.removeEventListener('error', onError);
+        };
+        const onSeeked = () => {
+          cleanup();
+          resolve();
+        };
+        const onError = () => {
+          cleanup();
+          reject(new Error('Gagal memposisikan video pada waktu mulai.'));
+        };
+        timer = window.setTimeout(() => {
+          cleanup();
+          if (Math.abs(userVideo.currentTime - trimStart) < 0.2) {
+            resolve();
+          } else {
+            reject(new Error('Batas waktu memposisikan video terlampaui.'));
+          }
+        }, 5000);
+
+        userVideo.addEventListener('seeked', onSeeked, { once: true });
+        userVideo.addEventListener('error', onError, { once: true });
+        userVideo.currentTime = trimStart;
+      });
+
+      try {
+        await userVideo.play();
+      } catch {
+        // Autoplay or background tab playback fallback
+      }
+    } catch (err) {
+      userVideo.pause();
+      try {
+        userVideo.currentTime = trimStart;
+      } catch {
+        // ignore
+      }
+      throw err;
+    }
+  }
   const stream = canvas.captureStream(30);
 
   return new Promise<Blob>((resolve, reject) => {
@@ -110,6 +215,15 @@ export function exportMotion(input: FrameInput, durationSeconds: number): Promis
       }
       for (const track of stream.getTracks()) {
         track.stop();
+      }
+      if (input.media.kind === 'video') {
+        const userVideo = input.media.source;
+        userVideo.pause();
+        try {
+          userVideo.currentTime = trimStart;
+        } catch {
+          // ignore
+        }
       }
     };
 
@@ -165,11 +279,17 @@ export function exportMotion(input: FrameInput, durationSeconds: number): Promis
 
     const durationMs = duration * 1000;
     const startTime = performance.now();
+    const userVideoSource = input.media.kind === 'video' ? input.media.source : null;
 
     const onFrame = (now: number) => {
       drawFrame(ctx, input, width, height);
       const elapsed = now - startTime;
-      if (elapsed >= durationMs) {
+      const videoReachedEnd = userVideoSource !== null && userVideoSource.currentTime >= trimEnd;
+
+      if (elapsed >= durationMs || videoReachedEnd) {
+        if (userVideoSource !== null) {
+          userVideoSource.pause();
+        }
         if (recorder.state !== 'inactive') {
           recorder.stop();
         }

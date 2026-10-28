@@ -1,13 +1,21 @@
-import type { PhotoMedia, TemplateSource } from '../../types/media';
+import type { UserMedia, TemplateSource } from '../../types/media';
 import type { TemplateManifest } from '../../types/template';
-import type { TransformState } from '../../types/editor';
+import type { TransformState, CutoutMask, ChromaKeySettings, VideoTrim } from '../../types/editor';
 import { drawSizeInSlot, isUncovered } from '../editor/transform';
+import { bakeMaskedMedia } from './masking';
+import { drawKeyedVideoFrame } from './keying';
 
 export interface FrameInput {
   template: TemplateSource;
-  media: PhotoMedia;
+  media: UserMedia;
   manifest: TemplateManifest;
   transform: TransformState;
+  /** Foto saja. Objek immutable; diganti (bukan dimutasi) tiap edit. */
+  mask?: CutoutMask | null;
+  /** Video saja. Objek immutable; diganti tiap edit. */
+  chroma?: ChromaKeySettings;
+  /** Video saja. Jendela putar/ekspor, detik. */
+  trim?: VideoTrim;
 }
 
 export function drawFrame(
@@ -18,7 +26,7 @@ export function drawFrame(
 ): void {
   if (outputWidth <= 0 || outputHeight <= 0) return;
 
-  const { template, media, manifest, transform } = input;
+  const { template, media, manifest, transform, mask, chroma } = input;
 
   ctx.clearRect(0, 0, outputWidth, outputHeight);
 
@@ -72,7 +80,16 @@ export function drawFrame(
     ctx.translate(centerX, centerY);
     ctx.rotate(transform.rotation);
     ctx.scale(transform.flipX ? -1 : 1, 1);
-    ctx.drawImage(media.source, -drawW / 2, -drawH / 2, drawW, drawH);
+    if (media.kind === 'photo') {
+      const source = mask ? bakeMaskedMedia(media, mask) : media.source;
+      ctx.drawImage(source, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else if (media.source.readyState >= 2) {
+      if (chroma?.enabled) {
+        drawKeyedVideoFrame(ctx, media.source, chroma, -drawW / 2, -drawH / 2, drawW, drawH);
+      } else {
+        ctx.drawImage(media.source, -drawW / 2, -drawH / 2, drawW, drawH);
+      }
+    }
 
     ctx.restore();
   }

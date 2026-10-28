@@ -1,4 +1,4 @@
-import type { PhotoMedia, TemplateImage, TemplateSource, TemplateVideo } from '../../types/media';
+import type { PhotoMedia, VideoMedia, TemplateImage, TemplateSource, TemplateVideo } from '../../types/media';
 import type { TemplateManifest } from '../../types/template';
 import { detectSlotFromAlpha } from '../template/slot-detect';
 import { buildTemplateManifest } from '../template/build-manifest';
@@ -18,12 +18,13 @@ export async function loadPhotoFile(file: File): Promise<PhotoMedia> {
     throw new Error('Gunakan file foto (JPG, PNG).');
   }
 
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => {
-    throw new Error('Gagal membaca file foto. Pastikan format file adalah JPG atau PNG.');
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch((err: unknown) => {
+    throw new Error('Gagal membaca file foto. Pastikan format file adalah JPG atau PNG.', { cause: err });
   });
 
   let released = false;
   return {
+    kind: 'photo',
     source: bitmap,
     width: bitmap.width,
     height: bitmap.height,
@@ -33,6 +34,88 @@ export async function loadPhotoFile(file: File): Promise<PhotoMedia> {
       bitmap.close();
     },
   };
+}
+
+export async function loadVideoFile(file: File): Promise<VideoMedia> {
+  if (!isVideoFile(file)) {
+    throw new Error('Gunakan file video (MP4, WebM, atau MOV).');
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  const video = document.createElement('video');
+  video.muted = true;
+  video.loop = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    URL.revokeObjectURL(objectUrl);
+  };
+
+  const waitForStage = (event: string, timeoutMs: number): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      let timer = 0;
+      const cleanup = () => {
+        window.clearTimeout(timer);
+        video.removeEventListener(event, onEvent);
+        video.removeEventListener('error', onError);
+      };
+      const onEvent = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = () => {
+        cleanup();
+        reject(new Error('Gagal memuat video. Pastikan format file valid dan tidak rusak.'));
+      };
+      timer = window.setTimeout(() => {
+        cleanup();
+        reject(new Error('Gagal memuat video. Pastikan format file valid dan tidak rusak.'));
+      }, timeoutMs);
+
+      video.addEventListener(event, onEvent, { once: true });
+      video.addEventListener('error', onError, { once: true });
+    });
+  };
+
+  try {
+    const metaPromise = waitForStage('loadedmetadata', 8000);
+    video.src = objectUrl;
+    await metaPromise;
+
+    if (video.readyState < 2) {
+      await waitForStage('loadeddata', 8000);
+    }
+
+    const duration = video.duration;
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+
+    if (!Number.isFinite(duration) || duration <= 0 || width <= 0 || height <= 0) {
+      throw new Error('Video tidak memiliki durasi atau dimensi yang valid.');
+    }
+
+    return {
+      kind: 'video',
+      source: video,
+      width,
+      height,
+      duration,
+      release,
+    };
+  } catch (err) {
+    release();
+    if (err instanceof Error) {
+      throw err;
+    }
+    throw new Error('Gagal memuat video. Pastikan format file valid dan tidak rusak.', { cause: err });
+  }
 }
 
 export async function loadTemplateImage(src: string): Promise<TemplateImage> {
@@ -251,9 +334,9 @@ export async function loadCustomTemplateFile(file: File): Promise<CustomTemplate
 
   if (isImageFile(file)) {
     const objectUrl = URL.createObjectURL(file);
-    const bitmap = await createImageBitmap(file).catch(() => {
+    const bitmap = await createImageBitmap(file).catch((err: unknown) => {
       URL.revokeObjectURL(objectUrl);
-      throw new Error('Gagal membaca file gambar.');
+      throw new Error('Gagal membaca file gambar.', { cause: err });
     });
 
     const width = bitmap.width;

@@ -44,6 +44,7 @@ export function PlaneCursor() {
       if (!shown) return;
       shown = false;
       plane.classList.remove('cursor-plane-visible');
+      plane.classList.remove('cursor-plane-grabbing');
       root.classList.remove('cursor-plane-active');
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
@@ -77,12 +78,6 @@ export function PlaneCursor() {
     };
 
     const onMove = (event: PointerEvent) => {
-      const target = event.target as Element | null;
-      if (target?.closest('canvas, .canvas-stage-wrapper')) {
-        hide();
-        return;
-      }
-
       posX = event.clientX;
       posY = event.clientY;
       plane.classList.remove('cursor-plane-idle');
@@ -108,12 +103,29 @@ export function PlaneCursor() {
       }, IDLE_DELAY_MS);
     };
 
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest('canvas, .canvas-stage-wrapper')) {
+        plane.classList.add('cursor-plane-grabbing');
+      }
+    };
+
+    const onPointerUp = () => {
+      plane.classList.remove('cursor-plane-grabbing');
+    };
+
     window.addEventListener('pointermove', onMove, { passive: true });
+    window.addEventListener('pointerdown', onPointerDown, { passive: true });
+    window.addEventListener('pointerup', onPointerUp, { passive: true });
+    window.addEventListener('pointercancel', onPointerUp, { passive: true });
     document.addEventListener('pointerleave', hide);
     window.addEventListener('blur', hide);
 
     return () => {
       window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
       document.removeEventListener('pointerleave', hide);
       window.removeEventListener('blur', hide);
       if (idleTimer !== null) window.clearTimeout(idleTimer);

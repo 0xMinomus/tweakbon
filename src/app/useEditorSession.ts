@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { PhotoMedia, TemplateSource } from '../types/media';
+import type { UserMedia, TemplateSource } from '../types/media';
 import type { TemplateManifest } from '../types/template';
-import type { TransformState } from '../types/editor';
+import type { TransformState, ChromaKeySettings, VideoTrim, CutoutMask } from '../types/editor';
 import {
   createTransform,
   reduceTransform,
@@ -10,13 +10,18 @@ import {
   type TransformAction,
   type TransformContext,
 } from '../features/editor/transform';
-import * as mediaModule from '../features/media/load';
+import { loadPhotoFile, loadVideoFile, loadCustomTemplateFile } from '../features/media/load';
+import { averageCornerColor } from '../features/render/keying';
+import { DEFAULT_CHROMA_KEY } from '../features/editor/chroma';
 
 export interface EditorSession {
-  media: PhotoMedia | null;
+  media: UserMedia | null;
   template: TemplateSource | null;
   manifest: TemplateManifest | null;
   transform: TransformState;
+  chroma: ChromaKeySettings;
+  trim: VideoTrim;
+  mask: CutoutMask | null;
   isLoading: boolean;
   error: string | null;
   minScale: number;
@@ -25,22 +30,29 @@ export interface EditorSession {
   setCustomTemplate: (file: File) => Promise<void>;
   clearTemplate: () => void;
   clearMedia: () => void;
+  setChroma: (next: ChromaKeySettings) => void;
+  setTrim: (next: VideoTrim) => void;
+  setMask: (next: CutoutMask | null) => void;
   dispatchTransform: (action: TransformAction) => void;
   clearError: () => void;
 }
 
 export function useEditorSession(initialManifest?: TemplateManifest | null): EditorSession {
-  const [media, setMediaState] = useState<PhotoMedia | null>(null);
+  const [media, setMediaState] = useState<UserMedia | null>(null);
   const [template, setTemplateState] = useState<TemplateSource | null>(null);
   const [manifest, setManifestState] = useState<TemplateManifest | null>(initialManifest ?? null);
   const [transform, setTransform] = useState<TransformState>(createTransform());
+  const [chroma, setChroma] = useState<ChromaKeySettings>(DEFAULT_CHROMA_KEY);
+  const [trim, setTrim] = useState<VideoTrim>({ start: 0, end: 1 });
+  const [mask, setMask] = useState<CutoutMask | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Keep references to resources for idempotent cleanup
-  const mediaRef = useRef<PhotoMedia | null>(null);
+  const mediaRef = useRef<UserMedia | null>(null);
   const templateRef = useRef<TemplateSource | null>(null);
   const customReleaseRef = useRef<(() => void) | null>(null);
+  const isMountedRef = useRef<boolean>(true);
 
   // Sync refs when states change
   useEffect(() => {
@@ -53,7 +65,9 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
 
   // Clean up all resources on unmount
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (mediaRef.current) {
         mediaRef.current.release();
         mediaRef.current = null;
@@ -94,40 +108,62 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     [manifest],
   );
 
-  // Set media (photo) file
+  // Set media (photo or video) file
   const setMedia = useCallback(
     async (file: File) => {
       setIsLoading(true);
       setError(null);
 
       try {
-        type MediaLoadModule = {
-          loadPhotoFile?: (f: File) => Promise<PhotoMedia>;
-          loadMediaFile?: (f: File) => Promise<PhotoMedia>;
-        };
-        const loadModule: MediaLoadModule = mediaModule;
-        const loadPhoto = loadModule.loadPhotoFile ?? loadModule.loadMediaFile;
-        if (!loadPhoto) {
-          throw new Error('Fungsi pemuatan foto tidak tersedia');
+        const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+
+        if (isVideo) {
+          const loadedVideo = await loadVideoFile(file);
+          if (!isMountedRef.current) {
+            loadedVideo.release();
+            return;
+          }
+
+          if (mediaRef.current) {
+            mediaRef.current.release();
+          }
+
+          mediaRef.current = loadedVideo;
+          setMediaState(loadedVideo);
+          setTransform(createTransform());
+          setChroma({
+            ...DEFAULT_CHROMA_KEY,
+            enabled: true,
+            color: averageCornerColor(loadedVideo.source),
+          });
+          setTrim({ start: 0, end: loadedVideo.duration });
+          setMask(null);
+        } else {
+          const loadedPhoto = await loadPhotoFile(file);
+          if (!isMountedRef.current) {
+            loadedPhoto.release();
+            return;
+          }
+
+          if (mediaRef.current) {
+            mediaRef.current.release();
+          }
+
+          mediaRef.current = loadedPhoto;
+          setMediaState(loadedPhoto);
+          setTransform(createTransform());
+          setMask(null);
+          setChroma(DEFAULT_CHROMA_KEY);
+          setTrim({ start: 0, end: 1 });
         }
-
-        const loadedPhoto = await loadPhoto(file);
-
-        // Release previous photo
-        if (mediaRef.current) {
-          mediaRef.current.release();
-        }
-
-        mediaRef.current = loadedPhoto;
-        setMediaState(loadedPhoto);
-
-        // Reset transform for new photo
-        setTransform(createTransform());
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Gagal memuat foto';
+        if (!isMountedRef.current) return;
+        const msg = err instanceof Error ? err.message : 'Gagal memuat media';
         setError(msg);
       } finally {
-        setIsLoading(false);
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
       }
     },
     [],
@@ -140,7 +176,11 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
       setError(null);
 
       try {
-        const custom = await mediaModule.loadCustomTemplateFile(file);
+        const custom = await loadCustomTemplateFile(file);
+        if (!isMountedRef.current) {
+          custom.release();
+          return;
+        }
 
         if (templateRef.current) {
           templateRef.current.release();
@@ -149,27 +189,23 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
           customReleaseRef.current();
         }
 
-        type CustomTemplateResult = {
-          manifest: TemplateManifest;
-          release: () => void;
-          template?: TemplateSource;
-          image?: TemplateSource;
-        };
-        const result: CustomTemplateResult = custom;
-        const templateSource = result.template ?? result.image;
+        const templateSource = custom.template ?? custom.image;
         if (!templateSource) {
           throw new Error('Gagal memproses template kustom');
         }
-        customReleaseRef.current = result.release;
+        customReleaseRef.current = custom.release;
         templateRef.current = templateSource;
         setTemplateState(templateSource);
-        setManifestState(result.manifest);
+        setManifestState(custom.manifest);
         setTransform(createTransform());
       } catch (err) {
+        if (!isMountedRef.current) return;
         const msg = err instanceof Error ? err.message : 'Gagal memproses template kustom';
         setError(msg);
       } finally {
-        setIsLoading(false);
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
       }
     },
     [],
@@ -194,6 +230,10 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
       mediaRef.current = null;
     }
     setMediaState(null);
+    setMask(null);
+    setChroma(DEFAULT_CHROMA_KEY);
+    setTrim({ start: 0, end: 1 });
+    setTransform(createTransform());
   }, []);
 
   return {
@@ -201,6 +241,9 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     template,
     manifest,
     transform,
+    chroma,
+    trim,
+    mask,
     isLoading,
     error,
     minScale: MIN_SCALE,
@@ -209,6 +252,9 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     setCustomTemplate,
     clearTemplate,
     clearMedia,
+    setChroma,
+    setTrim,
+    setMask,
     dispatchTransform,
     clearError,
   };

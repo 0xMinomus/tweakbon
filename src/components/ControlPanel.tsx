@@ -8,14 +8,17 @@ export interface ControlPanelProps {
   rotation: number;
   flipX: boolean;
   templateKind?: 'image' | 'video';
-  mediaKind?: 'image' | 'video';
+  mediaKind?: 'photo' | 'video';
   isExporting: boolean;
   isUncovered?: boolean;
+  showVideoDownload?: boolean;
   onZoom: (newScale: number) => void;
   onFit?: () => void;
   onRotate: (deltaRadians: number) => void;
   onFlip: () => void;
   onReset: () => void;
+  onOpenCutout?: () => void;
+  onOpenChroma?: () => void;
   onDownloadStill: () => void;
   onDownloadMotion?: () => void;
   onChangeMedia?: () => void;
@@ -30,14 +33,17 @@ export function ControlPanel({
   rotation,
   flipX,
   templateKind,
-  mediaKind = 'image',
+  mediaKind = 'photo',
   isExporting,
   isUncovered = false,
+  showVideoDownload,
   onZoom,
   onFit,
   onRotate,
   onFlip,
   onReset,
+  onOpenCutout,
+  onOpenChroma,
   onDownloadStill,
   onDownloadMotion,
   onChangeMedia,
@@ -45,10 +51,12 @@ export function ControlPanel({
   className = '',
 }: ControlPanelProps) {
   const hasMediaRecorder = typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined';
-  const effectiveTemplateKind = templateKind ?? mediaKind;
-  const showVideoDownload = effectiveTemplateKind === 'video' && hasMediaRecorder && Boolean(onDownloadMotion);
+  const canDownloadVideo = Boolean(
+    (showVideoDownload ?? (templateKind === 'video' || mediaKind === 'video')) &&
+    hasMediaRecorder &&
+    onDownloadMotion,
+  );
   const handleChangePhoto = onChangePhoto ?? onChangeMedia;
-
   const handleSliderChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     if (!Number.isNaN(val)) {
@@ -223,6 +231,34 @@ export function ControlPanel({
           Atur ulang
         </Button>
       </div>
+      {/* Media-specific cutout or chroma panel trigger */}
+      {mediaKind === 'photo' && onOpenCutout && (
+        <Button
+          type="button"
+          variant="accent"
+          size="md"
+          onClick={onOpenCutout}
+          disabled={isExporting}
+          style={{ width: '100%' }}
+          aria-label="Buka alat hapus latar foto"
+        >
+          Hapus latar foto
+        </Button>
+      )}
+
+      {mediaKind === 'video' && onOpenChroma && (
+        <Button
+          type="button"
+          variant="accent"
+          size="md"
+          onClick={onOpenChroma}
+          disabled={isExporting}
+          style={{ width: '100%' }}
+          aria-label="Buka pengaturan latar dan klip video"
+        >
+          Hapus latar & klip video
+        </Button>
+      )}
 
       {/* Main Download actions */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -237,7 +273,7 @@ export function ControlPanel({
           {isExporting ? 'Memproses...' : 'Unduh gambar (PNG)'}
         </Button>
 
-        {showVideoDownload && (
+        {canDownloadVideo && (
           <Button
             type="button"
             variant="mint"
@@ -246,7 +282,7 @@ export function ControlPanel({
             disabled={isExporting}
             style={{ width: '100%' }}
           >
-            {isExporting ? 'Merekam video...' : 'Unduh video (15 detik)'}
+            {isExporting ? 'Merekam video...' : 'Unduh video'}
           </Button>
         )}
 
@@ -258,7 +294,7 @@ export function ControlPanel({
           disabled={isExporting}
           style={{ width: '100%' }}
         >
-          Ganti foto
+          {mediaKind === 'video' ? 'Ganti video' : 'Ganti foto'}
         </Button>
       </div>
 

@@ -1,12 +1,12 @@
 import { useRef, useEffect } from 'react';
 import type { TemplateManifest } from '../types/template';
-import type { PhotoMedia } from '../types/media';
+import type { UserMedia } from '../types/media';
 import { DropPane } from '../components/DropPane';
 import { Button } from '../components/Button';
 
 export interface HeroProps {
   manifest: TemplateManifest | null;
-  media: PhotoMedia | null;
+  media: UserMedia | null;
   errorMessage?: string | null;
   onClearError?: () => void;
   onSelectCustomTemplate: (file: File) => void;
@@ -16,7 +16,7 @@ export interface HeroProps {
   onProceedToEditor: () => void;
 }
 
-function MediaThumbnail({ media }: { media: PhotoMedia }) {
+function MediaThumbnail({ media }: { media: UserMedia }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ function MediaThumbnail({ media }: { media: PhotoMedia }) {
     if (!ctx) return;
 
     const maxDim = 140;
-    const aspect = media.width / media.height;
+    const aspect = media.height > 0 ? media.width / media.height : 1;
     let w = maxDim;
     let h = maxDim;
     if (aspect >= 1) {
@@ -37,12 +37,28 @@ function MediaThumbnail({ media }: { media: PhotoMedia }) {
 
     canvas.width = w;
     canvas.height = h;
-    ctx.drawImage(media.source, 0, 0, w, h);
+
+    if (media.kind === 'photo') {
+      ctx.drawImage(media.source, 0, 0, w, h);
+    } else {
+      const video = media.source;
+      const drawVideo = () => {
+        ctx.drawImage(video, 0, 0, w, h);
+      };
+      if (video.readyState >= 2) {
+        drawVideo();
+      } else {
+        video.addEventListener('loadeddata', drawVideo, { once: true });
+        video.addEventListener('seeked', drawVideo, { once: true });
+      }
+    }
   }, [media]);
 
   return (
     <canvas
       ref={canvasRef}
+      role="img"
+      aria-label="Pratinjau media yang diunggah"
       style={{
         maxHeight: '140px',
         maxWidth: '100%',
@@ -129,11 +145,11 @@ export function Hero({
 
   let disabledReason = '';
   if (!manifest && !media) {
-    disabledReason = 'Isi template dan foto dulu';
+    disabledReason = 'Isi template dan foto atau video dulu';
   } else if (!manifest) {
     disabledReason = 'Pilih template dulu';
   } else if (!media) {
-    disabledReason = 'Pilih foto dulu';
+    disabledReason = 'Pilih foto atau video dulu';
   }
 
   const validateTemplate = (file: File) => {
@@ -147,8 +163,9 @@ export function Hero({
 
   const validateMedia = (file: File) => {
     const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|avif|gif)$/i.test(file.name);
-    if (!isImage) {
-      return 'Gunakan file foto (JPG, PNG, WebP).';
+    const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+    if (!isImage && !isVideo) {
+      return 'Gunakan file foto atau video.';
     }
     return null;
   };
@@ -230,14 +247,20 @@ export function Hero({
             errorMessage={errorMessage}
           />
 
-          {/* Right Pane: Photo */}
+          {/* Right Pane: Media */}
           <DropPane
-            title="2. Foto"
-            subtitle="Tarik foto ke sini, atau klik untuk memilih file."
-            accept="image/*"
+            title="2. Foto atau Video"
+            subtitle="Tarik foto atau video ke sini, atau klik untuk memilih file."
+            accept="image/*,video/*"
             filled={Boolean(media)}
             previewNode={media ? <MediaThumbnail media={media} /> : undefined}
-            infoText={media ? 'Foto terpasang' : undefined}
+            infoText={
+              media
+                ? media.kind === 'video'
+                  ? `Video · ${Math.round(media.duration)} detik`
+                  : 'Foto terpasang'
+                : undefined
+            }
             onSelectFile={handleSelectMedia}
             onClear={handleClearMedia}
             validate={validateMedia}

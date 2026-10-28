@@ -1,11 +1,13 @@
 import { useState, useRef, type ChangeEvent } from 'react';
 import type { EditorSession } from './useEditorSession';
 import { exportStill, exportMotion } from '../features/export/export';
+import type { FrameInput } from '../features/render/compositor';
 import { isUncovered, drawSizeInSlot } from '../features/editor/transform';
 import { CanvasStage } from '../components/CanvasStage';
 import { ControlPanel } from '../components/ControlPanel';
+import { PhotoCutoutEditor } from '../components/PhotoCutoutEditor';
+import { VideoKeyEditor } from '../components/VideoKeyEditor';
 import { Button } from '../components/Button';
-
 export interface EditorProps {
   session: EditorSession;
   onBack: () => void;
@@ -26,12 +28,12 @@ export function Editor({ session, onBack }: EditorProps) {
     dispatchTransform,
   } = session;
 
-  const [isExporting, setIsExporting] = useState(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [openPanel, setOpenPanel] = useState<'none' | 'cutout' | 'chroma'>('none');
 
   const templateInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
-
   const uncovered = (() => {
     if (!media || !manifest) return false;
     const slotAspect =
@@ -64,22 +66,31 @@ export function Editor({ session, onBack }: EditorProps) {
     e.target.value = '';
   };
 
+  const buildFrameInput = (): FrameInput | null => {
+    if (!template || !media || !manifest) return null;
+    const base: FrameInput = {
+      template,
+      media,
+      manifest,
+      transform,
+    };
+    if (media.kind === 'photo') {
+      base.mask = session.mask;
+    } else {
+      base.chroma = session.chroma;
+      base.trim = session.trim;
+    }
+    return base;
+  };
+
   const handleDownloadStill = async () => {
-    if (!template || !media || !manifest) return;
+    const input = buildFrameInput();
+    if (!input || !manifest) return;
     setIsExporting(true);
     setExportError(null);
 
     try {
-      const blob = await exportStill(
-        {
-          template,
-          media,
-          manifest,
-          transform,
-        },
-        'image/png',
-      );
-
+      const blob = await exportStill(input, 'image/png');
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -97,21 +108,16 @@ export function Editor({ session, onBack }: EditorProps) {
   };
 
   const handleDownloadMotion = async () => {
-    if (!template || !media || !manifest) return;
+    const input = buildFrameInput();
+    if (!input || !manifest || !media) return;
     setIsExporting(true);
     setExportError(null);
 
     try {
-      const durationSeconds = 15;
-      const blob = await exportMotion(
-        {
-          template,
-          media,
-          manifest,
-          transform,
-        },
-        durationSeconds,
-      );
+      const durationSeconds = media.kind === 'video'
+        ? Math.min(30, Math.max(1, session.trim.end - session.trim.start))
+        : 15;
+      const blob = await exportMotion(input, durationSeconds);
 
       const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
       const url = URL.createObjectURL(blob);
@@ -129,7 +135,6 @@ export function Editor({ session, onBack }: EditorProps) {
       setIsExporting(false);
     }
   };
-
   return (
     <div className="container" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Top navigation bar */}
@@ -170,7 +175,7 @@ export function Editor({ session, onBack }: EditorProps) {
       <input
         ref={photoInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         className="sr-only"
         onChange={handlePhotoInputChange}
         tabIndex={-1}
@@ -212,6 +217,9 @@ export function Editor({ session, onBack }: EditorProps) {
               media={media}
               manifest={manifest}
               transform={transform}
+              mask={session.mask}
+              chroma={session.chroma}
+              trim={session.trim}
               onAction={dispatchTransform}
             />
           ) : (
@@ -244,6 +252,8 @@ export function Editor({ session, onBack }: EditorProps) {
             rotation={transform.rotation}
             flipX={transform.flipX}
             templateKind={manifest?.kind}
+            mediaKind={media?.kind}
+            showVideoDownload={Boolean(manifest?.kind === 'video' || media?.kind === 'video')}
             isExporting={isExporting}
             onZoom={(newScale) => dispatchTransform({ type: 'scale', scale: newScale })}
             onFit={() => dispatchTransform({ type: 'scale', scale: 1 })}
@@ -251,10 +261,36 @@ export function Editor({ session, onBack }: EditorProps) {
             onRotate={(deltaRadians) => dispatchTransform({ type: 'rotate', deltaRadians })}
             onFlip={() => dispatchTransform({ type: 'flip' })}
             onReset={() => dispatchTransform({ type: 'reset' })}
+            onOpenCutout={() => setOpenPanel((prev) => (prev === 'cutout' ? 'none' : 'cutout'))}
+            onOpenChroma={() => setOpenPanel((prev) => (prev === 'chroma' ? 'none' : 'chroma'))}
             onDownloadStill={handleDownloadStill}
-            onDownloadMotion={manifest?.kind === 'video' ? handleDownloadMotion : undefined}
+            onDownloadMotion={handleDownloadMotion}
             onChangePhoto={handleChangePhotoClick}
           />
+
+          {openPanel === 'cutout' && media?.kind === 'photo' && (
+            <div style={{ marginTop: '20px' }}>
+              <PhotoCutoutEditor
+                media={media}
+                mask={session.mask}
+                onChange={session.setMask}
+                onClose={() => setOpenPanel('none')}
+              />
+            </div>
+          )}
+
+          {openPanel === 'chroma' && media?.kind === 'video' && (
+            <div style={{ marginTop: '20px' }}>
+              <VideoKeyEditor
+                media={media}
+                chroma={session.chroma}
+                trim={session.trim}
+                onChangeChroma={session.setChroma}
+                onChangeTrim={session.setTrim}
+                onClose={() => setOpenPanel('none')}
+              />
+            </div>
+          )}
         </section>
       </div>
     </div>

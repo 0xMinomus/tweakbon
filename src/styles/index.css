@@ -284,15 +284,21 @@ html.cursor-plane-active * {
   cursor: none !important;
 }
 
-html.cursor-plane-active canvas,
-html.cursor-plane-active .canvas-stage-wrapper,
-html.cursor-plane-active .canvas-stage-wrapper * {
-  cursor: grab !important;
+.cursor-plane-grabbing svg {
+  transform: scale(0.86) rotate(-8deg);
+  transition: transform 120ms ease-out;
 }
 
-html.cursor-plane-active canvas:active,
-html.cursor-plane-active .canvas-stage-wrapper:active {
-  cursor: grabbing !important;
+/* Checkerboard background for transparent media preview */
+.checkerboard-bg {
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+    linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
 
 /* ---------- Reveal on mount ---------- */

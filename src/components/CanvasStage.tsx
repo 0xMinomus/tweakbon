@@ -1,21 +1,26 @@
 import {
   useRef,
   useEffect,
+  useState,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { drawFrame } from '../features/render/compositor';
-import type { PhotoMedia, TemplateSource } from '../types/media';
+import type { UserMedia, TemplateSource } from '../types/media';
 import type { TemplateManifest } from '../types/template';
-import type { TransformState } from '../types/editor';
+import type { TransformState, CutoutMask, ChromaKeySettings, VideoTrim } from '../types/editor';
 import type { TransformAction } from '../features/editor/transform';
+import { Button } from './Button';
 
 export interface CanvasStageProps {
   template: TemplateSource;
-  media: PhotoMedia;
+  media: UserMedia;
   manifest: TemplateManifest;
   transform: TransformState;
+  mask?: CutoutMask | null;
+  chroma?: ChromaKeySettings;
+  trim?: VideoTrim;
   onAction: (action: TransformAction) => void;
   className?: string;
 }
@@ -25,6 +30,9 @@ export function CanvasStage({
   media,
   manifest,
   transform,
+  mask,
+  chroma,
+  trim,
   onAction,
   className = '',
 }: CanvasStageProps) {
@@ -35,6 +43,42 @@ export function CanvasStage({
   const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinchStartDistRef = useRef<number | null>(null);
   const pinchStartScaleRef = useRef<number>(transform.scale);
+
+  const [isPlaying, setIsPlaying] = useState(true);
+  const trimRef = useRef<VideoTrim | undefined>(trim);
+
+  useEffect(() => {
+    trimRef.current = trim;
+  }, [trim]);
+
+  // Handle video media playback
+  useEffect(() => {
+    if (media.kind !== 'video') return;
+    const video = media.source;
+    video.muted = true;
+    const currentTrim = trimRef.current;
+    const start = currentTrim ? currentTrim.start : 0;
+    if (video.currentTime < start) {
+      video.currentTime = start;
+    }
+    void video.play().then(() => {
+      setIsPlaying(true);
+    }).catch(() => {
+      setIsPlaying(false);
+    });
+  }, [media]);
+
+  const togglePlay = () => {
+    if (media.kind !== 'video') return;
+    const video = media.source;
+    if (video.paused) {
+      void video.play().catch(() => {});
+      setIsPlaying(true);
+    } else {
+      video.pause();
+      setIsPlaying(false);
+    }
+  };
 
   // Render on transform change or continuously for video
   useEffect(() => {
@@ -70,13 +114,26 @@ export function CanvasStage({
             media,
             manifest,
             transform,
+            mask,
+            chroma,
+            trim,
           },
           targetW,
           targetH,
         );
       }
 
-      if (template.kind === 'video') {
+      if (media.kind === 'video') {
+        const video = media.source;
+        const currentTrim = trimRef.current;
+        const start = currentTrim ? currentTrim.start : 0;
+        const end = currentTrim ? currentTrim.end : (media.duration || 1);
+        if (video.currentTime >= end || video.currentTime < start) {
+          video.currentTime = start;
+        }
+      }
+
+      if (template.kind === 'video' || media.kind === 'video') {
         animId = requestAnimationFrame(render);
       }
     };
@@ -89,8 +146,7 @@ export function CanvasStage({
         cancelAnimationFrame(animId);
       }
     };
-  }, [template, media, manifest, transform]);
-
+  }, [template, media, manifest, transform, mask, chroma, trim]);
   // Pointer event handlers
   const handlePointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -106,8 +162,8 @@ export function CanvasStage({
   const handlePointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     const pointers = activePointersRef.current;
     if (!pointers.has(e.pointerId)) return;
-
-    const prevPos = pointers.get(e.pointerId)!;
+    const prevPos = pointers.get(e.pointerId);
+    if (!prevPos) return;
     const currentPos = { x: e.clientX, y: e.clientY };
     pointers.set(e.pointerId, currentPos);
 
@@ -226,6 +282,20 @@ export function CanvasStage({
         alignItems: 'center',
       }}
     >
+      {media.kind === 'video' && (
+        <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+          <Button
+            type="button"
+            size="sm"
+            variant={isPlaying ? 'mint' : 'sand'}
+            onClick={togglePlay}
+            aria-pressed={isPlaying}
+            aria-label={isPlaying ? 'Jeda pemutaran video' : 'Putar video'}
+          >
+            {isPlaying ? 'Jeda' : 'Putar'}
+          </Button>
+        </div>
+      )}
       <div
         style={{
           width: '100%',
@@ -254,7 +324,6 @@ export function CanvasStage({
             width: '100%',
             height: '100%',
             display: 'block',
-            cursor: 'grab',
           }}
         />
       </div>

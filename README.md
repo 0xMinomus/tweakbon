@@ -1,10 +1,16 @@
 # Tweakbon
 
-Tweakbon is a client-side web application that composites a user's photo into custom Twibbon template frames. The landing view features a two-pane hero: select or drop a template (PNG with transparency or video) on the left pane, supply personal photo media on the right pane, and proceed with an explicit continue action. The editor provides panning, rotation, and zooming from 50% scale (zoom-out) up to 400% before exporting.
+Tweakbon is a client-side web application that composites a user's photo or video into custom Twibbon template frames. The landing view features a two-pane hero: select or drop a template (PNG with transparency or video) on the left pane, supply personal photo or video media on the right pane, and proceed with an explicit continue action. The editor provides panning, rotation, and zooming from 50% scale (zoom-out) up to 400% before exporting.
 
 The editor header features a template switcher to replace the active template directly, while photo adjustments and replacement remain in the control panel.
 
-The interface uses a custom paper-plane cursor that tracks pointer position 1:1, unwraps its target angle, and interpolates rotation through `requestAnimationFrame` so 360-degree turns have no visual discontinuity. It falls back to native cursors under `prefers-reduced-motion: reduce`, on touch devices lacking hover support, and over the interactive canvas stage.
+The interface uses a custom paper-plane cursor that tracks pointer position 1:1, unwraps its target angle, and interpolates rotation through `requestAnimationFrame` so 360-degree turns have no visual discontinuity. The plane stays visible over the canvas and while dragging, with `.cursor-plane-grabbing` as drag feedback, and only falls back to native cursors under `prefers-reduced-motion: reduce` or on touch devices lacking hover support.
+
+## Editor Features
+
+- **Chroma key video**: Remove background color from video media using a 32³ LUT with similarity, smoothness, and despill controls.
+- **Photo cutout mask**: Edit photo cutout masks using contiguous magic wand flood fill, manual brush strokes (erase/restore), and automatic edge-color background detection.
+- **Direct video export**: Record canvas motion and export directly to video based on user trim windows and template duration up to 30 seconds.
 
 Refer to [AGENTS.md](./AGENTS.md) for architecture rules, code conventions, and development guidelines.
 

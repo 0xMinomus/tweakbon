@@ -20,7 +20,7 @@ All user media and processing remain strictly on the client device:
    - Motion exports are recorded locally through `HTMLCanvasElement.captureStream()` and the native `MediaRecorder` API.
    - Files are downloaded via temporary object URLs that are revoked immediately after download initiation.
 
-At no point in this pipeline does user media or uploaded template assets pass through a remote server, external proxy, or cloud worker.
+At no point in this pipeline does user media or uploaded template assets pass through a remote server, external proxy, or cloud worker. Photos and videos are processed entirely in the browser and are never uploaded.
 
 ## Absence of Network Data Transmission
 

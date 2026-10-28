@@ -7,7 +7,7 @@ Tweakbon is structured around strict separation of domain logic, canvas renderin
 The system is organized into three distinct layers:
 
 1. **Domain (Pure TypeScript)**
-   - Located in `src/features/editor/`, `src/features/template/`, and `src/lib/`.
+   - Located in `src/features/editor/` and `src/features/template/`.
    - Handles geometry calculations, transform clamping, slot aspect ratios, manifest construction, and alpha detection.
    - Contains zero DOM references, React imports, or Canvas rendering calls.
    - Completely deterministic and unit-testable in isolation.
@@ -115,6 +115,28 @@ The editor provides distinct controls for template and photo management:
 - **Header Template Switcher**: The editor header includes a dedicated template replacement button. Users can pick a new PNG or video template directly without returning to the landing view or losing current session context.
 - **Control Panel Photo Replacement**: Photo replacement remains available within the editor control panel, alongside zoom, rotation, horizontal flip, and reset adjustments. The former generic media switcher in the header has been replaced by the template changer.
 
+## Video Media & Chroma Key
+
+Video media loaded via `loadVideoFile` is decoded into a looping `<video>` element and composited through `drawKeyedVideoFrame`:
+
+- **Processing Flow**: `loadVideoFile` mounts local user video, and `drawKeyedVideoFrame` processes video frames onto an intermediate work canvas capped at 1280 px before compositing into the slot.
+- **LUT Acceleration**: Keying uses a precomputed 32³ (32,768 entries) RGB lookup table built by `buildChromaKeyLut`.
+- **Despill Filter**: `despill` removes key colour contamination specifically on edge pixels between similarity and smoothness thresholds.
+- **Settings Contract**: `ChromaKeySettings` (`similarity`, `smoothness`, `spill`) normalize all controls to the `0..1` range for UI slider binding.
+- **Playback Window & Export**: `VideoTrim` (`start`, `end`) sets the preview and export playback window. Total motion export duration is constrained by `min(trimDuration, templateDuration, 30s)`.
+
+## Photo Cutout Mask
+
+User photos support background removal and fine adjustment via an in-memory cutout mask:
+
+- **Mask Format**: `CutoutMask` stores an alpha buffer (`Uint8ClampedArray`) row-major in source-media pixel coordinates (`0` = removed, `255` = kept).
+- **Immutability**: Every mask edit produces a new mask object to keep state transitions explicit.
+- **Domain Operations**:
+  - `magicWandErase`: 4-neighbour flood fill erasing contiguous matching regions from a seed coordinate within color tolerance.
+  - `autoEraseBackground`: global eraser sampling the outer boundary ring average and clearing all pixels within tolerance across the entire image.
+  - `strokeMask`: circular brush stamping along line segments for manual erasing (`keep = false`) or restoring (`keep = true`).
+- **Compositor Integration & Export**: The mask is capped to a 2048 px working resolution for edits and smoothly resampled back to full media size at bake time, and the compositor applies it with destination-in compositing. The resulting alpha mask renders cleanly in both interactive canvas stages and full-resolution PNG exports.
+
 ## Cursor Lifecycle, Angle Unwrapping & Opt-Outs
 
 The interface features an interactive paper-plane cursor (`.cursor-plane`):
@@ -124,25 +146,23 @@ The interface features an interactive paper-plane cursor (`.cursor-plane`):
 - **Rotational Interpolation**: The cursor rotates toward its target angle via linear interpolation once per `requestAnimationFrame`, ensuring seamless multi-revolution spins without snapping or broken frames.
 - **Loop Halting**: The animation loop halts when pointer movement settles and the rotational delta falls below 0.1 degree, preserving CPU cycles during idle periods.
 - **Idle Float**: When the pointer rests, the cursor transitions into a gentle float rather than disappearing.
-- **Scoped `cursor: none`**: The `cursor-plane-active` class applies `cursor: none` to `document.documentElement` while active.
+- **Global `cursor: none`**: Native cursors are hidden globally across the viewport while the paper plane is active.
+- **Canvas Stage & Drag Feedback**: The canvas stage no longer displays native `cursor: grab` or `cursor: grabbing`. Instead, the `.cursor-plane-grabbing` class is applied to the paper plane element for tactile drag feedback.
 
 ### Cursor Opt-Outs
 
-The custom cursor automatically disables under three conditions:
+The custom cursor automatically disables under two conditions:
 
 1. **Reduced Motion**: Under `prefers-reduced-motion: reduce`, the custom cursor element is hidden and native cursor behavior remains active.
 2. **Touch & Mobile Pointers**: Devices matching `(hover: none)` or coarse pointer queries omit the plane cursor entirely.
-3. **Canvas Stage**: When hovering over the editor canvas stage, CSS rules restore `cursor: grab` and `cursor: grabbing` so users receive tactile feedback for photo manipulation gestures.
-
 ## Responsibility Map
 
 | Directory | Primary Ownership | Key Responsibilities |
 |---|---|---|
 | `src/types/` | Shared Contracts | Immutable TypeScript interfaces: `TransformState`, `PhotoMedia`, `TemplateSource`, `TemplateManifest`, `SlotRect`. |
-| `src/lib/` | Shared Utilities | Pure geometry calculations, math helpers, and bounding box solvers. |
 | `src/features/editor/` | Domain | Transform factory, reducer functions, scale and offset clamping within slot bounds, `isUncovered` check. |
 | `src/features/template/` | Domain | Manifest parsing, `buildTemplateManifest`, schema guards, and alpha mask slot detection. |
-| `src/features/media/` | Media Engine | Photo loading (`loadPhotoFile`), custom template loading (`loadCustomTemplateFile`), resource cleanup, and object URL lifecycle. |
+| `src/features/media/` | Media Engine | Photo and video loading (`loadPhotoFile`, `loadVideoFile`), custom template loading (`loadCustomTemplateFile`), resource cleanup, and object URL lifecycle. |
 | `src/features/render/` | Rendering | Canvas 2D layer compositor (`drawFrame`), uncovered slot background fills, clipping paths, and DPR handling. |
 | `src/features/export/` | Export Engine | Natural resolution offscreen rendering, still PNG encoding, and video stream recording. |
 | `src/components/` | Presentational UI | Interactive canvas stage, two-pane hero components, control panel, and paper-plane cursor. |

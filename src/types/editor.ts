@@ -27,3 +27,50 @@ export interface DrawSize {
   width: number;
   height: number;
 }
+
+/** An sRGB colour, channels 0..255. */
+export interface Rgb {
+  r: number;
+  g: number;
+  b: number;
+}
+
+/**
+ * Chroma key settings. Applied only to video media; a photo never carries one.
+ * All three amounts are 0..1 so the UI can bind them to plain sliders.
+ */
+export interface ChromaKeySettings {
+  /** false draws the video untouched. */
+  enabled: boolean;
+  /** Colour treated as background. */
+  color: Rgb;
+  /** Core match width: higher removes more of the surrounding colour. */
+  similarity: number;
+  /** Edge softness: higher feathers the boundary. */
+  smoothness: number;
+  /** Colour de-spill on kept pixels: higher pulls the key colour out of edges. */
+  spill: number;
+}
+
+/** Playback window of the user's video, in seconds. `start < end`. */
+export interface VideoTrim {
+  start: number;
+  end: number;
+}
+
+/**
+ * Photo background removal mask. Big and non-serializable: it lives in a ref,
+ * never in React state. `alpha` is one byte per source pixel, row-major,
+ * `width * height` long; 0 = removed, 255 = kept.
+ */
+export interface CutoutMask {
+  width: number;
+  height: number;
+  alpha: Uint8ClampedArray;
+}
+
+/** A point in source-media pixel coordinates. */
+export interface MaskPoint {
+  x: number;
+  y: number;
+}

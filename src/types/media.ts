@@ -5,21 +5,40 @@ import type { SlotRect } from './template';
  *
  * Two inputs, deliberately asymmetric:
  *  - the template (left pane) is a still image OR a video, and carries the
- *    transparent slot the user's photo shows through;
- *  - the user photo (right pane) is always a still image.
+ *    transparent slot the user's media shows through;
+ *  - the user media (right pane) is a still photo OR a video without alpha.
+ *
+ * A video user medium is opaque: its background is removed with chroma key,
+ * never by relying on the encoded alpha channel.
  *
  * Media objects are large and non-serializable. They never enter React state;
  * they live in refs or an owner object. Every source carries its own release().
  */
 
-/** The user's photo. Always a still image. */
+/** The user's still photo. */
 export interface PhotoMedia {
+  kind: 'photo';
   source: ImageBitmap;
   width: number;
   height: number;
   /** Idempotent. Called on replace and on unmount. */
   release: () => void;
 }
+
+/** The user's video. Always opaque; chroma key decides what is removed. */
+export interface VideoMedia {
+  kind: 'video';
+  source: HTMLVideoElement;
+  width: number;
+  height: number;
+  /** Clip length in seconds; finite and > 0. */
+  duration: number;
+  /** Idempotent. Called on replace and on unmount. */
+  release: () => void;
+}
+
+/** Whatever the user dropped in the media pane. */
+export type UserMedia = PhotoMedia | VideoMedia;
 
 /** A still template frame, ready for drawImage. */
 export interface TemplateImage {

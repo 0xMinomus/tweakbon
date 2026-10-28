@@ -1,0 +1,49 @@
+{
+  "templates": [
+    {
+      "id": "merdeka",
+      "name": "Merdeka",
+      "kind": "image",
+      "src": "/templates/merdeka.svg",
+      "naturalWidth": 1080,
+      "naturalHeight": 1350,
+      "slot": {
+        "x": 0.125,
+        "y": 0.12,
+        "width": 0.75,
+        "height": 0.7
+      },
+      "defaultFit": "cover"
+    },
+    {
+      "id": "wisuda",
+      "name": "Wisuda",
+      "kind": "image",
+      "src": "/templates/wisuda.svg",
+      "naturalWidth": 1080,
+      "naturalHeight": 1080,
+      "slot": {
+        "x": 0.075,
+        "y": 0.2,
+        "width": 0.6,
+        "height": 0.6
+      },
+      "defaultFit": "cover"
+    },
+    {
+      "id": "kelas",
+      "name": "Foto Kelas",
+      "kind": "image",
+      "src": "/templates/kelas.svg",
+      "naturalWidth": 1080,
+      "naturalHeight": 1350,
+      "slot": {
+        "x": 0.075,
+        "y": 0.24,
+        "width": 0.85,
+        "height": 0.5
+      },
+      "defaultFit": "cover"
+    }
+  ]
+}

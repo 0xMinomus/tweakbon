@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <!-- Base sky frame with transparent hole via evenodd -->
+  <path fill="#C0F7FE" fill-rule="evenodd" d="M 0 0 H 1080 V 1080 H 0 Z M 81 216 H 729 V 864 H 81 Z" />
+
+  <!-- Top header (outside slot) -->
+  <g transform="translate(81, 40)">
+    <rect x="8" y="8" width="918" height="130" fill="#000000" rx="4" />
+    <rect x="0" y="0" width="918" height="130" fill="#99E885" stroke="#000000" stroke-width="6" rx="4" />
+    <text x="459" y="58" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="4">HARI KELULUSAN</text>
+    <text x="459" y="104" font-family="system-ui, -apple-system, sans-serif" font-size="44" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="3">SELAMAT WISUDA</text>
+  </g>
+
+  <!-- Slot border -->
+  <rect x="81" y="216" width="648" height="648" fill="none" stroke="#000000" stroke-width="8" />
+
+  <!-- Right side panel (x: 755 to 1010, y: 216 to 864) -->
+  <g transform="translate(760, 216)">
+    <!-- Graduation Cap card -->
+    <rect x="6" y="6" width="240" height="200" fill="#000000" rx="4" />
+    <rect x="0" y="0" width="240" height="200" fill="#FFF8EC" stroke="#000000" stroke-width="6" rx="4" />
+    <!-- Toga icon -->
+    <polygon points="120,40 210,75 120,110 30,75" fill="#000000" />
+    <rect x="75" y="105" width="90" height="40" fill="#000000" rx="2" />
+    <circle cx="120" cy="75" r="8" fill="#F7CB46" />
+    <path d="M 120 75 Q 170 85 180 130" stroke="#F7CB46" stroke-width="5" fill="none" />
+    <text x="120" y="175" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="900" fill="#000000" text-anchor="middle">GRADUATE</text>
+
+    <!-- Star badge -->
+    <g transform="translate(0, 230)">
+      <rect x="6" y="6" width="240" height="180" fill="#000000" rx="4" />
+      <rect x="0" y="0" width="240" height="180" fill="#F7CB46" stroke="#000000" stroke-width="6" rx="4" />
+      <text x="120" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" fill="#000000" text-anchor="middle">BANGGA</text>
+      <text x="120" y="100" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="900" fill="#000000" text-anchor="middle">&amp; SUKSES</text>
+      <circle cx="50" cy="140" r="14" fill="#99E885" stroke="#000000" stroke-width="4" />
+      <circle cx="120" cy="140" r="14" fill="#FE90E8" stroke="#000000" stroke-width="4" />
+      <circle cx="190" cy="140" r="14" fill="#99E885" stroke="#000000" stroke-width="4" />
+    </g>
+
+    <!-- Year card -->
+    <g transform="translate(0, 440)">
+      <rect x="6" y="6" width="240" height="200" fill="#000000" rx="4" />
+      <rect x="0" y="0" width="240" height="200" fill="#99E885" stroke="#000000" stroke-width="6" rx="4" />
+      <text x="120" y="80" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="900" fill="#000000" text-anchor="middle">ANGKATAN</text>
+      <text x="120" y="140" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="900" fill="#000000" text-anchor="middle">2026</text>
+    </g>
+  </g>
+
+  <!-- Bottom banner (outside slot) -->
+  <g transform="translate(81, 895)">
+    <rect x="6" y="6" width="918" height="135" fill="#000000" rx="4" />
+    <rect x="0" y="0" width="918" height="135" fill="#FFF8EC" stroke="#000000" stroke-width="6" rx="4" />
+    <text x="459" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" fill="#000000" text-anchor="middle" letter-spacing="2">LANGKAH BARU MENUJU MASA DEPAN</text>
+    <text x="459" y="102" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="800" fill="#000000" text-anchor="middle" letter-spacing="3">CONGRATULATIONS ON YOUR ACHIEVEMENT</text>
+  </g>
+
+  <!-- Outer frame border -->
+  <rect x="4" y="4" width="1072" height="1072" fill="none" stroke="#000000" stroke-width="8" />
+</svg>

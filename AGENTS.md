@@ -2,7 +2,7 @@
 
 Tweakbon is a browser tool that puts a person's photo or video into a Twibbon template. The user supplies a template with a transparent region (the "slot"), supplies their own media, then pans, zooms, and rotates that media until it sits correctly inside the slot. Image and video templates follow the same flow.
 
-> **Status: greenfield.** The repository currently contains only documentation. Every path and command below is the agreed target layout, not an observation of existing code. When the scaffold lands, correct this file in the same change.
+> **Status: working.** The hero-to-editor-to-download flow is implemented and verified in Chromium: photo and video media, PNG and MP4 export, three shipped templates, and a custom PNG template path. No backend. Tests, lint, typecheck and build are green.
 
 ## Project Overview
 
@@ -58,33 +58,37 @@ user media ──► decode to ImageBitmap | HTMLVideoElement ──────
 
 ```
 src/
-  app/            entry, routing, page shells
+  app/            view switch, hero, editor, session hook
   features/
-    template/     manifest schema, loading, slot detection
-    media/        decoding, bitmap cache, object URL lifecycle
-    editor/       transform state, gestures, clamping
-    render/       compositor, layer order, DPR handling
-    export/       PNG/JPEG encode now, video encode later
+    template/     manifest schema, index loader, slot detection
+    media/        decoding, object URL lifecycle
+    editor/       transform state, clamping, cover math
+    render/       compositor, layer order, slot clipping
+    export/       PNG still, MP4/WebM motion
   components/     shared presentational UI
-  lib/            pure helpers: geometry, math, guards
+  styles/         design tokens, base styles
   types/          shared contracts (template, media, transform)
 public/
-  templates/      sample templates plus their manifests
+  templates/      three SVGs plus index.json
+scripts/          template validator (plain node, no deps)
+tests/            filesystem-level checks
+docs/             architecture, template authoring, privacy
 ```
 
-Feature-first. A module belongs to the feature that owns the behavior it implements; shared code moves to `components/` or `lib/` only after a second consumer exists.
+Feature-first. A module belongs to the feature that owns the behavior it implements; shared code moves to `components/` only after a second consumer exists. `src/lib/` does not exist yet — do not create it for a single helper.
 
 ## Development Commands
 
 ```bash
 npm install
 npm run dev          # Vite dev server
-npm run build        # tsc -b && vite build
+npm run build        # tsc --noEmit && vite build
 npm run preview      # serve the production build
 npm run typecheck    # tsc --noEmit
 npm run lint         # ESLint
 npm test             # Vitest, single run
 npm run test:watch   # Vitest, watch
+npm run validate:templates  # node scripts/validate-templates.mjs
 ```
 
 `typecheck`, `lint`, `test`, and `build` must all pass before a change is considered done. If a script is missing, add it rather than documenting a manual equivalent.
@@ -94,7 +98,7 @@ npm run test:watch   # Vitest, watch
 - **TypeScript strict.** No `any`, no `@ts-ignore` without an adjacent reason, no non-null assertions in new code. Prefer `unknown` plus a narrowing guard at trust boundaries.
 - **Files** `kebab-case.ts` / `kebab-case.tsx`. **Components and types** `PascalCase`. **Functions and variables** `camelCase`. **Hooks** `useThing`.
 - **Named exports everywhere.** No default exports except where a tool requires them.
-- **Purity.** Geometry, clamping, and manifest parsing live in `lib/` or `features/*/` as plain functions. If a function needs `document`, it belongs to `render/` or `media/`.
+- **Purity.** Geometry, clamping, and manifest parsing live in `features/*/` as plain functions with no React and no DOM. If a function needs `document`, it belongs to `components/` or `media/`.
 - **State.** Local React state first. `useReducer` when transitions are named and ordered. No global store until two unrelated features need the same data; then a single context, not a library.
 - **Large objects stay outside React.** `ImageBitmap`, `HTMLVideoElement`, and canvases live in refs or a module-level cache. React state holds only serializable descriptors (ids, transforms, flags).
 - **Resource lifetime is explicit.** Every `createImageBitmap` has a `close()`, every `URL.createObjectURL` has a `revokeObjectURL`, every `requestAnimationFrame` has a `cancelAnimationFrame`. Cleanup lives in the `useEffect` return or an owner object.
@@ -113,15 +117,23 @@ npm run test:watch   # Vitest, watch
 | `tsconfig.json` | strict compiler settings |
 | `eslint.config.js` | flat config, TypeScript rules |
 | `src/main.tsx` | React root |
-| `src/app/App.tsx` | page shell, feature wiring |
-| `src/features/render/compositor.ts` | layer order, slot clipping, DPR scaling |
-| `src/features/editor/editor-state.ts` | transform reducer and clamping rules |
-| `src/features/template/manifest.ts` | schema parse + validation, slot source of truth |
-| `src/features/export/encode.ts` | offscreen render at natural resolution, encode |
-| `src/types/template.ts` | `TemplateManifest`, `Slot`, `MediaKind` |
-| `public/templates/*.json` | template manifests shipped with the app |
+| `src/app/App.tsx` | view switch (`hero` \| `editor`), template index load |
+| `src/app/useEditorSession.ts` | glue: owns media, template, transform, loading and error state |
+| `src/app/Hero.tsx` | title, drop zone, template strip, privacy line |
+| `src/features/editor/transform.ts` | transform reducer, scale clamp, cover math, offset clamping |
+| `src/features/template/manifest.ts` | manifest parse/validate, index loader |
+| `src/features/template/slot-detect.ts` | alpha bounding-box detection for custom templates |
+| `src/features/media/load.ts` | image/video decode, template fetch, idempotent `release()` |
+| `src/features/render/compositor.ts` | draw order, slot clipping, transform application |
+| `src/features/export/export.ts` | offscreen still render, MediaRecorder motion export |
+| `src/components/CanvasStage.tsx` | DPR canvas, pointer/pinch/keyboard input, rAF loop |
+| `src/types/template.ts` | `TemplateManifest`, `SlotRect`, `Point` |
+| `src/types/media.ts` | `MediaSource`, `TemplateImage` |
+| `src/types/editor.ts` | `TransformState`, `DrawSize` |
+| `public/templates/index.json` | shipped `TemplateIndex` |
+| `public/templates/*.svg` | three templates: `merdeka`, `wisuda`, `kelas` |
 
-A template manifest is the contract. Fields: `id`, `kind` (`image` | `video`), `naturalWidth`, `naturalHeight`, `slot` (`x`, `y`, `width`, `height` in normalized units), optional `slotPolygon` for non-rectangular holes.
+A template manifest is the contract. Fields: `id`, `name`, `kind` (`image` | `video`), `src`, `naturalWidth`, `naturalHeight`, `slot` (`x`, `y`, `width`, `height` in normalized units), optional `slotPolygon` for non-rectangular holes, optional `defaultFit`.
 
 ## Runtime & Tooling Preferences
 

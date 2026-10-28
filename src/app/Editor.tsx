@@ -2,6 +2,7 @@ import { useState, useRef, type ChangeEvent } from 'react';
 import type { TemplateManifest } from '../types/template';
 import type { EditorSession } from './useEditorSession';
 import { exportStill, exportMotion } from '../features/export/export';
+import { isUncovered, drawSizeInSlot } from '../features/editor/transform';
 import { CanvasStage } from '../components/CanvasStage';
 import { ControlPanel } from '../components/ControlPanel';
 import { TemplatePicker } from '../components/TemplatePicker';
@@ -33,6 +34,13 @@ export function Editor({ session, templates, onBack }: EditorProps) {
   const [exportError, setExportError] = useState<string | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
+  const uncovered = (() => {
+    if (!media || !manifest) return false;
+    const slotAspect =
+      (manifest.slot.width * manifest.naturalWidth) / (manifest.slot.height * manifest.naturalHeight);
+    const draw = drawSizeInSlot(media.width, media.height, slotAspect, transform.scale);
+    return isUncovered(transform, draw);
+  })();
   const mediaInputRef = useRef<HTMLInputElement>(null);
 
   const handleChangeMediaClick = () => {
@@ -252,6 +260,8 @@ export function Editor({ session, templates, onBack }: EditorProps) {
             mediaKind={media?.kind}
             isExporting={isExporting}
             onZoom={(newScale) => dispatchTransform({ type: 'scale', scale: newScale })}
+            onFit={() => dispatchTransform({ type: 'scale', scale: 1 })}
+            isUncovered={uncovered}
             onRotate={(deltaRadians) => dispatchTransform({ type: 'rotate', deltaRadians })}
             onFlip={() => dispatchTransform({ type: 'flip' })}
             onReset={() => dispatchTransform({ type: 'reset' })}

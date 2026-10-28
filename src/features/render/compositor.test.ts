@@ -13,6 +13,7 @@ function createRecordingContext() {
   const calls: RecordedCall[] = [];
   const ctx = {
     calls,
+    fillStyle: '',
     clearRect: (x: number, y: number, w: number, h: number) => {
       calls.push({ method: 'clearRect', args: [x, y, w, h] });
     },
@@ -27,6 +28,12 @@ function createRecordingContext() {
     },
     rect: (x: number, y: number, w: number, h: number) => {
       calls.push({ method: 'rect', args: [x, y, w, h] });
+    },
+    fillRect: (x: number, y: number, w: number, h: number) => {
+      calls.push({ method: 'fillRect', args: [x, y, w, h] });
+    },
+    fill: () => {
+      calls.push({ method: 'fill', args: [] });
     },
     moveTo: (x: number, y: number) => {
       calls.push({ method: 'moveTo', args: [x, y] });
@@ -267,5 +274,69 @@ describe('compositor drawFrame', () => {
 
     drawFrame(ctx, input, 500, -10);
     expect(ctx.calls).toHaveLength(0);
+  });
+
+  it('fills uncovered rect slot with #FFF8EC before media draw', () => {
+    const ctx = createRecordingContext();
+    const input: FrameInput = {
+      template: baseTemplate,
+      media: baseMedia,
+      manifest: baseManifest,
+      transform: { ...defaultTransform, scale: 0.5 },
+    };
+
+    drawFrame(ctx, input, 500, 500);
+
+    expect(ctx.fillStyle).toBe('#FFF8EC');
+    const fillRectIdx = ctx.calls.findIndex((c) => c.method === 'fillRect');
+    const clipIdx = ctx.calls.findIndex((c) => c.method === 'clip');
+    const mediaDrawIdx = ctx.calls.findIndex((c) => c.method === 'drawImage');
+
+    expect(fillRectIdx).toBeGreaterThan(clipIdx);
+    expect(fillRectIdx).toBeLessThan(mediaDrawIdx);
+    expect(ctx.calls[fillRectIdx].args).toEqual([50, 50, 400, 400]);
+  });
+
+  it('fills uncovered polygon slot with #FFF8EC before media draw', () => {
+    const ctx = createRecordingContext();
+    const manifestWithPolygon: TemplateManifest = {
+      ...baseManifest,
+      slotPolygon: [
+        { x: 0.2, y: 0.2 },
+        { x: 0.8, y: 0.2 },
+        { x: 0.5, y: 0.8 },
+      ],
+    };
+    const input: FrameInput = {
+      template: baseTemplate,
+      media: baseMedia,
+      manifest: manifestWithPolygon,
+      transform: { ...defaultTransform, scale: 0.5 },
+    };
+
+    drawFrame(ctx, input, 1000, 1000);
+
+    expect(ctx.fillStyle).toBe('#FFF8EC');
+    const fillIdx = ctx.calls.findIndex((c) => c.method === 'fill');
+    const clipIdx = ctx.calls.findIndex((c) => c.method === 'clip');
+    const mediaDrawIdx = ctx.calls.findIndex((c) => c.method === 'drawImage');
+
+    expect(fillIdx).toBeGreaterThan(clipIdx);
+    expect(fillIdx).toBeLessThan(mediaDrawIdx);
+  });
+
+  it('does not fill background when media covers slot', () => {
+    const ctx = createRecordingContext();
+    const input: FrameInput = {
+      template: baseTemplate,
+      media: baseMedia,
+      manifest: baseManifest,
+      transform: { ...defaultTransform, scale: 1 },
+    };
+
+    drawFrame(ctx, input, 500, 500);
+
+    const hasFill = ctx.calls.some((c) => c.method === 'fillRect' || c.method === 'fill');
+    expect(hasFill).toBe(false);
   });
 });

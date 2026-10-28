@@ -9,7 +9,9 @@ export interface ControlPanelProps {
   flipX: boolean;
   mediaKind?: 'image' | 'video';
   isExporting: boolean;
+  isUncovered?: boolean;
   onZoom: (newScale: number) => void;
+  onFit?: () => void;
   onRotate: (deltaRadians: number) => void;
   onFlip: () => void;
   onReset: () => void;
@@ -23,10 +25,13 @@ export function ControlPanel({
   scale,
   minScale,
   maxScale,
+  rotation,
   flipX,
   mediaKind = 'image',
   isExporting,
+  isUncovered = false,
   onZoom,
+  onFit,
   onRotate,
   onFlip,
   onReset,
@@ -142,7 +147,36 @@ export function ControlPanel({
           >
             +
           </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="mint"
+            onClick={onFit ? onFit : () => onZoom(1)}
+            disabled={scale === 1}
+            aria-label="Atur ukuran pas (skala 1)"
+          >
+            Fit
+          </Button>
         </div>
+
+        {isUncovered && (
+          <div
+            style={{
+              marginTop: '12px',
+              padding: '8px 12px',
+              backgroundColor: 'var(--sand)',
+              border: '2px solid var(--ink)',
+              borderRadius: 'var(--radius)',
+              boxShadow: '2px 2px 0 var(--ink)',
+              fontSize: '13px',
+              fontWeight: 800,
+              color: 'var(--ink)',
+            }}
+          >
+            Foto lebih kecil dari bingkai
+          </div>
+        )}
       </div>
 
       {/* Transform buttons: Rotate, Flip, Reset */}
@@ -158,7 +192,7 @@ export function ControlPanel({
           variant="sky"
           size="sm"
           onClick={handleRotate90}
-          aria-label="Putar 90 derajat searah jarum jam"
+          aria-label={`Putar 90 derajat searah jarum jam (sudut saat ini ${Math.round(((rotation * 180) / Math.PI) % 360)} derajat)`}
         >
           Putar 90°
         </Button>

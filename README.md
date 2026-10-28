@@ -1,6 +1,8 @@
 # Tweakbon
 
-Tweakbon is a client-side web application that composites user photos or videos into Twibbon template frames. Users select a template, supply their media, adjust placement with drag, zoom, and rotation controls, and export the composite file.
+Tweakbon is a client-side web application that composites user photos or videos into Twibbon template frames. The landing view features a two-pane hero: select or drop a template on the left pane, supply personal photo or video media on the right pane, and proceed with an explicit continue action. The editor provides panning, rotation, and zooming from 50% scale (zoom-out) up to 400% before exporting.
+
+The user interface includes a custom paper-plane cursor that tracks pointer movement and fades out after 500ms of inactivity. The custom cursor falls back to native system cursors under `prefers-reduced-motion: reduce`, on touch devices lacking hover support, and over the interactive canvas stage.
 
 Refer to [AGENTS.md](./AGENTS.md) for architecture rules, code conventions, and development guidelines.
 
@@ -77,14 +79,14 @@ Detailed authoring requirements are in [docs/templates.md](./docs/templates.md).
 
 ```
 src/
-  app/            Page shell, view switching, and editor session state
+  app/            Page shell, two-pane hero, and editor session state
   features/
     editor/       Transform state, gesture handling, and slot clamping
     template/     Manifest parsing, schema validation, and slot detection
     media/        Decoding, bitmap cache, and object URL lifecycle
     render/       Canvas 2D compositor and layer ordering
     export/       Still image and video encoding
-  components/     Presentational UI components
+  components/     Presentational UI components and custom cursor
   lib/            Pure math and geometry helpers
   types/          Contract interfaces for editor, media, and template
 public/

@@ -4,6 +4,7 @@ import { loadTemplateIndex } from '../features/template/manifest';
 import { useEditorSession } from './useEditorSession';
 import { Hero } from './Hero';
 import { Editor } from './Editor';
+import { PlaneCursor } from '../components/PlaneCursor';
 
 export function App() {
   const [view, setView] = useState<'hero' | 'editor'>('hero');
@@ -11,9 +12,9 @@ export function App() {
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateManifest | null>(null);
 
   const session = useEditorSession(selectedTemplate);
-  const { setTemplate } = session;
+  const { setTemplate, clearTemplate, clearMedia, setMedia, setCustomTemplate } = session;
 
-  // Effect A: load template index on mount
+  // Effect A: load template index on mount (NO auto-select)
   useEffect(() => {
     let isMounted = true;
 
@@ -21,7 +22,6 @@ export function App() {
       if (!isMounted) return;
       if (res.ok && res.value.templates.length > 0) {
         setTemplates(res.value.templates);
-        setSelectedTemplate(res.value.templates[0]);
       }
     });
 
@@ -42,17 +42,27 @@ export function App() {
   };
 
   const handleSelectCustomTemplate = (file: File) => {
-    void session.setCustomTemplate(file);
+    setSelectedTemplate(null);
+    void setCustomTemplate(file);
   };
 
-  const handleSelectMediaFile = async (file: File) => {
-    // If template not yet loaded, load selected or first template
-    const tpl = selectedTemplate || templates[0];
-    if (tpl && !session.template) {
-      await session.setTemplate(tpl);
+  const handleClearTemplate = () => {
+    setSelectedTemplate(null);
+    clearTemplate();
+  };
+
+  const handleSelectMediaFile = (file: File) => {
+    void setMedia(file);
+  };
+
+  const handleClearMedia = () => {
+    clearMedia();
+  };
+
+  const handleProceedToEditor = () => {
+    if (session.manifest && session.media) {
+      setView('editor');
     }
-    await session.setMedia(file);
-    setView('editor');
   };
 
   const handleBack = () => {
@@ -60,22 +70,25 @@ export function App() {
   };
 
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {view === 'hero' ? (
-        <Hero
-          templates={templates}
-          selectedTemplate={selectedTemplate}
-          onSelectTemplate={handleSelectTemplate}
-          onSelectCustomTemplate={handleSelectCustomTemplate}
-          onSelectMediaFile={handleSelectMediaFile}
-        />
-      ) : (
-        <Editor
-          session={session}
-          templates={templates}
-          onBack={handleBack}
-        />
-      )}
-    </main>
+    <>
+      <PlaneCursor />
+      <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        {view === 'hero' ? (
+          <Hero
+            templates={templates}
+            manifest={session.manifest}
+            media={session.media}
+            onSelectTemplate={handleSelectTemplate}
+            onSelectCustomTemplate={handleSelectCustomTemplate}
+            onClearTemplate={handleClearTemplate}
+            onSelectMediaFile={handleSelectMediaFile}
+            onClearMedia={handleClearMedia}
+            onProceedToEditor={handleProceedToEditor}
+          />
+        ) : (
+          <Editor session={session} templates={templates} onBack={handleBack} />
+        )}
+      </main>
+    </>
   );
 }

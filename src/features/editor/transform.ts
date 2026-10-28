@@ -1,6 +1,6 @@
 import type { DrawSize, TransformState } from '../../types/editor';
 
-export const MIN_SCALE = 1;
+export const MIN_SCALE = 0.5;
 export const MAX_SCALE = 4;
 
 export type TransformAction =
@@ -86,6 +86,21 @@ export function clampTransform(transform: TransformState, draw: DrawSize): Trans
     flipX: Boolean(transform.flipX),
   };
 }
+/** True when the media no longer covers the slot, so the slot shows background. */
+export function isUncovered(transform: TransformState, draw: DrawSize): boolean {
+  const rotation = Number.isFinite(transform.rotation) ? transform.rotation : 0;
+  const cos = Math.abs(Math.cos(rotation));
+  const sin = Math.abs(Math.sin(rotation));
+
+  const w = Number.isFinite(draw.width) ? Math.max(0, draw.width) : 0;
+  const h = Number.isFinite(draw.height) ? Math.max(0, draw.height) : 0;
+
+  const bboxW = w * cos + h * sin;
+  const bboxH = w * sin + h * cos;
+
+  return bboxW < 1 || bboxH < 1;
+}
+
 
 export function reduceTransform(
   state: TransformState,

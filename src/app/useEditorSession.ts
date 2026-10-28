@@ -10,8 +10,7 @@ import {
   type TransformAction,
   type TransformContext,
 } from '../features/editor/transform';
-import { loadMediaFile, loadTemplateImage } from '../features/media/load';
-import { detectSlotFromAlpha } from '../features/template/slot-detect';
+import { loadMediaFile, loadTemplateImage, loadCustomTemplateFile } from '../features/media/load';
 
 export interface EditorSession {
   media: MediaSource | null;
@@ -25,6 +24,8 @@ export interface EditorSession {
   setMedia: (file: File) => Promise<void>;
   setTemplate: (manifest: TemplateManifest) => Promise<void>;
   setCustomTemplate: (file: File) => Promise<void>;
+  clearTemplate: () => void;
+  clearMedia: () => void;
   dispatchTransform: (action: TransformAction) => void;
   clearError: () => void;
 }
@@ -40,7 +41,7 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
   // Keep references to resources for idempotent cleanup
   const mediaRef = useRef<MediaSource | null>(null);
   const templateRef = useRef<TemplateImage | null>(null);
-  const customUrlRef = useRef<string | null>(null);
+  const customReleaseRef = useRef<(() => void) | null>(null);
 
   // Sync refs when states change
   useEffect(() => {
@@ -62,9 +63,9 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
         templateRef.current.release();
         templateRef.current = null;
       }
-      if (customUrlRef.current) {
-        URL.revokeObjectURL(customUrlRef.current);
-        customUrlRef.current = null;
+      if (customReleaseRef.current) {
+        customReleaseRef.current();
+        customReleaseRef.current = null;
       }
     };
   }, []);
@@ -136,6 +137,10 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
         if (templateRef.current) {
           templateRef.current.release();
         }
+        if (customReleaseRef.current) {
+          customReleaseRef.current();
+          customReleaseRef.current = null;
+        }
 
         templateRef.current = loadedTemplate;
         setTemplateState(loadedTemplate);
@@ -153,76 +158,28 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     [],
   );
 
-  // Set custom template from user PNG file
+  // Set custom template using loadCustomTemplateFile
   const setCustomTemplate = useCallback(
     async (file: File) => {
       setIsLoading(true);
       setError(null);
 
-      let objectUrl: string | null = null;
       try {
-        objectUrl = URL.createObjectURL(file);
-
-        const img = new Image();
-        img.src = objectUrl;
-        await img.decode();
-
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          throw new Error('Gagal menyiapkan kanvas untuk membaca template');
-        }
-
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        const detectedSlot = detectSlotFromAlpha({
-          data: imageData.data,
-          width: imageData.width,
-          height: imageData.height,
-        });
-
-        if (!detectedSlot) {
-          URL.revokeObjectURL(objectUrl);
-          setError('Tidak ditemukan area transparan pada template. Gunakan file PNG dengan latar belakang tembus pandang.');
-          setIsLoading(false);
-          return;
-        }
-
-        const customManifest: TemplateManifest = {
-          id: 'custom',
-          name: 'Template Kustom',
-          kind: 'image',
-          src: objectUrl,
-          naturalWidth: img.naturalWidth,
-          naturalHeight: img.naturalHeight,
-          slot: detectedSlot,
-          defaultFit: 'cover',
-        };
-
-        // Revoke older custom URL if present
-        if (customUrlRef.current) {
-          URL.revokeObjectURL(customUrlRef.current);
-        }
-        customUrlRef.current = objectUrl;
-
-        const loadedTemplate = await loadTemplateImage(customManifest.src);
+        const custom = await loadCustomTemplateFile(file);
 
         if (templateRef.current) {
           templateRef.current.release();
         }
+        if (customReleaseRef.current) {
+          customReleaseRef.current();
+        }
 
-        templateRef.current = loadedTemplate;
-        setTemplateState(loadedTemplate);
-        setManifestState(customManifest);
+        customReleaseRef.current = custom.release;
+        templateRef.current = custom.image;
+        setTemplateState(custom.image);
+        setManifestState(custom.manifest);
         setTransform(createTransform());
       } catch (err) {
-        if (objectUrl) {
-          URL.revokeObjectURL(objectUrl);
-        }
         const msg = err instanceof Error ? err.message : 'Gagal memproses template kustom';
         setError(msg);
       } finally {
@@ -231,6 +188,27 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     },
     [],
   );
+
+  const clearTemplate = useCallback(() => {
+    if (templateRef.current) {
+      templateRef.current.release();
+      templateRef.current = null;
+    }
+    if (customReleaseRef.current) {
+      customReleaseRef.current();
+      customReleaseRef.current = null;
+    }
+    setTemplateState(null);
+    setManifestState(null);
+  }, []);
+
+  const clearMedia = useCallback(() => {
+    if (mediaRef.current) {
+      mediaRef.current.release();
+      mediaRef.current = null;
+    }
+    setMediaState(null);
+  }, []);
 
   return {
     media,
@@ -244,6 +222,8 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     setMedia,
     setTemplate,
     setCustomTemplate,
+    clearTemplate,
+    clearMedia,
     dispatchTransform,
     clearError,
   };

@@ -5,6 +5,7 @@ import {
   clampTransform,
   createTransform,
   drawSizeInSlot,
+  isUncovered,
   reduceTransform,
   type TransformContext,
 } from './transform';
@@ -62,12 +63,29 @@ describe('drawSizeInSlot', () => {
 });
 
 describe('clampTransform', () => {
-  it('clamps scale within MIN_SCALE and MAX_SCALE', () => {
+  it('clamps scale within MIN_SCALE (0.5) and MAX_SCALE (4)', () => {
+    expect(MIN_SCALE).toBe(0.5);
+
     const below = clampTransform({ ...createTransform(), scale: 0.2 }, { width: 1, height: 1 });
-    expect(below.scale).toBe(MIN_SCALE);
+    expect(below.scale).toBe(0.5);
+
+    const atMin = clampTransform({ ...createTransform(), scale: 0.5 }, { width: 0.5, height: 0.5 });
+    expect(atMin.scale).toBe(0.5);
 
     const above = clampTransform({ ...createTransform(), scale: 9 }, { width: 1, height: 1 });
     expect(above.scale).toBe(MAX_SCALE);
+    expect(above.scale).toBe(4);
+  });
+
+  it('centers offsets while uncovered at scale 0.5', () => {
+    const draw = { width: 0.5, height: 0.5 };
+    const clamped = clampTransform(
+      { ...createTransform(), scale: 0.5, offsetX: 0.4, offsetY: -0.3 },
+      draw,
+    );
+    expect(clamped.scale).toBe(0.5);
+    expect(clamped.offsetX).toBe(0);
+    expect(clamped.offsetY).toBe(0);
   });
 
   it('clamps offset at positive and negative edges', () => {
@@ -111,6 +129,45 @@ describe('clampTransform', () => {
     expect(rotated.offsetX).toBeCloseTo(0.1);
   });
 });
+
+describe('isUncovered', () => {
+  it('returns true at scale 0.5 (smaller than slot)', () => {
+    const transform = { ...createTransform(), scale: 0.5 };
+    const draw = drawSizeInSlot(100, 100, 1, 0.5);
+    expect(isUncovered(transform, draw)).toBe(true);
+  });
+
+  it('returns false at scale 1 (covers slot exactly)', () => {
+    const transform = { ...createTransform(), scale: 1 };
+    const draw = drawSizeInSlot(100, 100, 1, 1);
+    expect(isUncovered(transform, draw)).toBe(false);
+  });
+
+  it('returns false at scale 2 (covers slot with margin)', () => {
+    const transform = { ...createTransform(), scale: 2 };
+    const draw = drawSizeInSlot(100, 100, 1, 2);
+    expect(isUncovered(transform, draw)).toBe(false);
+  });
+
+  it('returns true when only one axis is smaller than 1', () => {
+    const transform = { ...createTransform(), scale: 0.6 };
+    const wideDraw = { width: 1.2, height: 0.6 };
+    expect(isUncovered(transform, wideDraw)).toBe(true);
+
+    const tallDraw = { width: 0.6, height: 1.2 };
+    expect(isUncovered(transform, tallDraw)).toBe(true);
+  });
+
+  it('accounts for rotation expanding bounding box', () => {
+    const unrotated = { ...createTransform(), scale: 0.8, rotation: 0 };
+    const rotated = { ...createTransform(), scale: 0.8, rotation: Math.PI / 4 };
+    const draw = { width: 0.8, height: 0.8 };
+
+    expect(isUncovered(unrotated, draw)).toBe(true);
+    expect(isUncovered(rotated, draw)).toBe(false);
+  });
+});
+
 
 describe('reduceTransform', () => {
   const context: TransformContext = {
@@ -160,6 +217,39 @@ describe('reduceTransform', () => {
     );
     expect(nanScaled.scale).toBe(MIN_SCALE);
   });
+  it('clamps zoom out to MIN_SCALE (0.5) and keeps offsets centered when uncovered', () => {
+    const squareContext: TransformContext = {
+      mediaWidth: 100,
+      mediaHeight: 100,
+      slotAspect: 1,
+    };
+
+    const zoomedOut = reduceTransform(
+      createTransform(),
+      { type: 'scale', scale: 0.5 },
+      squareContext,
+    );
+    expect(zoomedOut.scale).toBe(0.5);
+    expect(zoomedOut.offsetX).toBe(0);
+    expect(zoomedOut.offsetY).toBe(0);
+
+    const belowMin = reduceTransform(
+      createTransform(),
+      { type: 'scale', scale: 0.1 },
+      squareContext,
+    );
+    expect(belowMin.scale).toBe(0.5);
+
+    // Drag while uncovered should remain centered at 0
+    const dragged = reduceTransform(
+      zoomedOut,
+      { type: 'drag', deltaX: 0.3, deltaY: -0.3 },
+      squareContext,
+    );
+    expect(dragged.offsetX).toBe(0);
+    expect(dragged.offsetY).toBe(0);
+  });
+
 
   it('normalizes rotation into [0, 2pi)', () => {
     const r1 = reduceTransform(

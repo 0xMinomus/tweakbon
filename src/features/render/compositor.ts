@@ -1,7 +1,7 @@
 import type { MediaSource, TemplateImage } from '../../types/media';
 import type { TemplateManifest } from '../../types/template';
 import type { TransformState } from '../../types/editor';
-import { drawSizeInSlot } from '../editor/transform';
+import { drawSizeInSlot, isUncovered } from '../editor/transform';
 
 export interface FrameInput {
   template: TemplateImage;
@@ -51,9 +51,24 @@ export function drawFrame(
 
     const slotAspect = slotW / slotH;
     const sizeInSlot = drawSizeInSlot(media.width, media.height, slotAspect, transform.scale);
+
+    if (isUncovered(transform, sizeInSlot)) {
+      ctx.fillStyle = '#FFF8EC';
+      if (polygon && polygon.length >= 3) {
+        ctx.beginPath();
+        ctx.moveTo(polygon[0].x * outputWidth, polygon[0].y * outputHeight);
+        for (let i = 1; i < polygon.length; i++) {
+          ctx.lineTo(polygon[i].x * outputWidth, polygon[i].y * outputHeight);
+        }
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.fillRect(slotX, slotY, slotW, slotH);
+      }
+    }
+
     const drawW = sizeInSlot.width * slotW;
     const drawH = sizeInSlot.height * slotH;
-
     const centerX = slotX + slotW / 2 + transform.offsetX * slotW;
     const centerY = slotY + slotH / 2 + transform.offsetY * slotH;
 

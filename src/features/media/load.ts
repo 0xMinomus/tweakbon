@@ -1,4 +1,6 @@
 import type { MediaSource, TemplateImage } from '../../types/media';
+import type { TemplateManifest } from '../../types/template';
+import { detectSlotFromAlpha } from '../template/slot-detect';
 
 const UNSUPPORTED_MESSAGE = 'Format file tidak didukung. Harap pilih file JPG, PNG, atau MP4.';
 
@@ -117,5 +119,97 @@ export async function loadTemplateImage(src: string): Promise<TemplateImage> {
       released = true;
       bitmap.close();
     },
+  };
+}
+
+export interface CustomTemplate {
+  manifest: TemplateManifest;
+  image: TemplateImage;
+  release: () => void;
+}
+
+export async function loadCustomTemplateFile(file: File): Promise<CustomTemplate> {
+  if (!isImageFile(file)) {
+    throw new Error('Format file tidak didukung. Harap pilih file gambar (PNG, JPG, atau WebP).');
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  let bitmap: ImageBitmap;
+
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    URL.revokeObjectURL(objectUrl);
+    throw new Error('Gagal membaca file gambar.');
+  }
+
+  const width = bitmap.width;
+  const height = bitmap.height;
+  let imageData: ImageData;
+
+  if (typeof OffscreenCanvas !== 'undefined') {
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      bitmap.close();
+      URL.revokeObjectURL(objectUrl);
+      throw new Error('Gagal memproses gambar template.');
+    }
+    ctx.drawImage(bitmap, 0, 0);
+    imageData = ctx.getImageData(0, 0, width, height);
+  } else {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      bitmap.close();
+      URL.revokeObjectURL(objectUrl);
+      throw new Error('Gagal memproses gambar template.');
+    }
+    ctx.drawImage(bitmap, 0, 0);
+    imageData = ctx.getImageData(0, 0, width, height);
+  }
+  const slot = detectSlotFromAlpha({
+    width,
+    height,
+    data: imageData.data,
+  });
+  if (!slot) {
+    bitmap.close();
+    URL.revokeObjectURL(objectUrl);
+    throw new Error('Tidak ditemukan area transparan pada template. Harap gunakan file gambar dengan latar belakang transparan.');
+  }
+
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    bitmap.close();
+    URL.revokeObjectURL(objectUrl);
+  };
+
+  const manifest: TemplateManifest = {
+    id: 'custom',
+    name: 'Template Kustom',
+    kind: 'image',
+    src: objectUrl,
+    naturalWidth: width,
+    naturalHeight: height,
+    slot,
+    defaultFit: 'cover',
+  };
+
+  const image: TemplateImage = {
+    source: bitmap,
+    width,
+    height,
+    release,
+  };
+
+  return {
+    manifest,
+    image,
+    release,
   };
 }

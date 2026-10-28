@@ -1,39 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import { detectSlotFromAlpha, type AlphaMask } from './slot-detect';
 
-function createMask(
+function createBuffer(
   width: number,
   height: number,
-  fillAlpha = 0,
-): { mask: AlphaMask; setPixel: (x: number, y: number, alpha: number) => void; fillRect: (x: number, y: number, w: number, h: number, alpha: number) => void } {
+  hole?: { x: number; y: number; width: number; height: number },
+  defaultAlpha = 255,
+): AlphaMask {
   const data = new Uint8ClampedArray(width * height * 4);
-  if (fillAlpha > 0) {
-    for (let i = 3; i < data.length; i += 4) {
-      data[i] = fillAlpha;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      data[idx] = 255;
+      data[idx + 1] = 255;
+      data[idx + 2] = 255;
+
+      const isInsideHole =
+        hole &&
+        x >= hole.x &&
+        x < hole.x + hole.width &&
+        y >= hole.y &&
+        y < hole.y + hole.height;
+
+      data[idx + 3] = isInsideHole ? 0 : defaultAlpha;
     }
   }
 
-  const setPixel = (x: number, y: number, alpha: number) => {
-    data[(y * width + x) * 4 + 3] = alpha;
-  };
-
-  const fillRect = (x: number, y: number, w: number, h: number, alpha: number) => {
-    for (let py = y; py < y + h; py++) {
-      for (let px = x; px < x + w; px++) {
-        setPixel(px, py, alpha);
-      }
-    }
-  };
-
-  return { mask: { width, height, data }, setPixel, fillRect };
+  return { width, height, data };
 }
 
 describe('detectSlotFromAlpha', () => {
-  it('detects centered slot rectangle', () => {
-    const { mask, fillRect } = createMask(100, 100, 0);
-    fillRect(25, 25, 50, 50, 255);
-
+  it('detects centered hole in an opaque template', () => {
+    const mask = createBuffer(100, 100, { x: 25, y: 25, width: 50, height: 50 });
     const slot = detectSlotFromAlpha(mask);
+
     expect(slot).toEqual({
       x: 0.25,
       y: 0.25,
@@ -42,53 +43,67 @@ describe('detectSlotFromAlpha', () => {
     });
   });
 
-  it('detects edge-touching slot rectangle', () => {
-    const { mask, fillRect } = createMask(100, 100, 0);
-    fillRect(0, 0, 50, 100, 255);
-
+  it('detects offset hole', () => {
+    const mask = createBuffer(200, 100, { x: 20, y: 10, width: 120, height: 50 });
     const slot = detectSlotFromAlpha(mask);
-    expect(slot).toEqual({
-      x: 0,
-      y: 0,
-      width: 0.5,
-      height: 1,
-    });
 
-    const { mask: rightMask, fillRect: fillRight } = createMask(100, 100, 0);
-    fillRight(50, 50, 50, 50, 255);
-    const rightSlot = detectSlotFromAlpha(rightMask);
-    expect(rightSlot).toEqual({
-      x: 0.5,
-      y: 0.5,
-      width: 0.5,
+    expect(slot).toEqual({
+      x: 0.1,
+      y: 0.1,
+      width: 0.6,
       height: 0.5,
     });
   });
 
-  it('ignores sub-threshold alpha pixels', () => {
-    const { mask, fillRect, setPixel } = createMask(100, 100, 0);
-    fillRect(20, 20, 60, 60, 200);
+  it('detects hole touching an edge', () => {
+    const leftMask = createBuffer(100, 100, { x: 0, y: 20, width: 50, height: 60 });
+    const leftSlot = detectSlotFromAlpha(leftMask);
 
-    // Noisy background pixels below threshold
-    setPixel(5, 5, 15);
-    setPixel(95, 95, 10);
-
-    const slot = detectSlotFromAlpha(mask, 50);
-    expect(slot).toEqual({
-      x: 0.2,
+    expect(leftSlot).toEqual({
+      x: 0,
       y: 0.2,
-      width: 0.6,
+      width: 0.5,
       height: 0.6,
     });
 
-    const { mask: allSubMask, fillRect: fillAllSub } = createMask(50, 50, 0);
-    fillAllSub(10, 10, 20, 20, 10);
-    expect(detectSlotFromAlpha(allSubMask, 50)).toBeNull();
+    const rightBottomMask = createBuffer(100, 100, { x: 50, y: 40, width: 50, height: 60 });
+    const rightBottomSlot = detectSlotFromAlpha(rightBottomMask);
+
+    expect(rightBottomSlot).toEqual({
+      x: 0.5,
+      y: 0.4,
+      width: 0.5,
+      height: 0.6,
+    });
   });
 
-  it('returns null on empty mask where all pixels have zero alpha', () => {
-    const { mask } = createMask(60, 60, 0);
+  it('returns null when template image is completely opaque', () => {
+    const mask = createBuffer(100, 100);
     expect(detectSlotFromAlpha(mask)).toBeNull();
+  });
+
+  it('returns null when template image is fully transparent', () => {
+    const mask = createBuffer(100, 100, undefined, 0);
+    expect(detectSlotFromAlpha(mask)).toBeNull();
+  });
+
+  it('ignores isolated stray transparent pixels outside the main hole', () => {
+    const mask = createBuffer(100, 100, { x: 25, y: 25, width: 50, height: 50 });
+
+    // Stray transparent pixels (alpha = 0)
+    const stray1 = (5 * 100 + 5) * 4 + 3;
+    const stray2 = (95 * 100 + 95) * 4 + 3;
+    (mask.data as Uint8ClampedArray)[stray1] = 0;
+    (mask.data as Uint8ClampedArray)[stray2] = 0;
+
+    const slot = detectSlotFromAlpha(mask);
+
+    expect(slot).toEqual({
+      x: 0.25,
+      y: 0.25,
+      width: 0.5,
+      height: 0.5,
+    });
   });
 
   it('returns null on zero-size or short buffer', () => {
@@ -99,8 +114,34 @@ describe('detectSlotFromAlpha', () => {
       detectSlotFromAlpha({
         width: 10,
         height: 10,
-        data: new Uint8Array(10), // Needs 400 bytes, only has 10
+        data: new Uint8Array(10),
       }),
     ).toBeNull();
+  });
+
+  it('respects custom alphaThreshold', () => {
+    const width = 100;
+    const height = 100;
+    const data = new Uint8ClampedArray(width * height * 4);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const inHole = x >= 20 && x < 80 && y >= 20 && y < 80;
+        data[idx + 3] = inHole ? 15 : 255;
+      }
+    }
+
+    // With default threshold (0), alpha 15 is not considered transparent
+    expect(detectSlotFromAlpha({ width, height, data })).toBeNull();
+
+    // With threshold 20, alpha 15 is transparent
+    const slot = detectSlotFromAlpha({ width, height, data }, 20);
+    expect(slot).toEqual({
+      x: 0.2,
+      y: 0.2,
+      width: 0.6,
+      height: 0.6,
+    });
   });
 });

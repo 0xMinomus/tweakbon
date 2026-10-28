@@ -121,6 +121,13 @@ Normalized values must strictly satisfy:
 
 A tolerance of $\pm 10^{-4}$ is allowed for floating-point rounding.
 
+## Custom Templates & Alpha Detection
+
+User-uploaded custom templates (such as user-supplied PNG files) are loaded through `loadCustomTemplateFile`:
+
+- **Contiguous Transparency Requirement**: The template file must have one contiguous transparent region that acts as the media slot.
+- **Bounding Box Approximation**: Automated alpha detection calculates the axis-aligned bounding box of transparent pixels. A circular, oval, or non-rectangular cutout is therefore approximated by its enclosing rectangular bounding box unless an author provides a full catalog manifest containing an explicit `slotPolygon` definition.
+
 ## Catalog Validation Command
 
 To verify that template SVGs, manifest fields, and normalized slot geometry align correctly:

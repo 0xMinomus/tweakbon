@@ -5,3 +5,5 @@ coverage
 *.local
 *.log
 .herdr/
+.tmp-downloads/
+.vitest/

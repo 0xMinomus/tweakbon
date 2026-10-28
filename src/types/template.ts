@@ -38,8 +38,3 @@ export interface TemplateManifest {
   /** Author hint for the initial fit. Defaults to 'cover'. */
   defaultFit?: 'cover' | 'contain';
 }
-
-/** Shape of `public/templates/index.json`. */
-export interface TemplateIndex {
-  templates: TemplateManifest[];
-}

@@ -82,9 +82,18 @@ export function exportMotion(input: FrameInput, durationSeconds: number): Promis
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Gagal membuat 2D context untuk export.');
 
-  const duration = Number.isFinite(durationSeconds)
-    ? Math.min(30, Math.max(1, durationSeconds))
-    : 1;
+  let duration = Number.isFinite(durationSeconds) && durationSeconds > 0
+    ? durationSeconds
+    : 15;
+
+  if (input.template.kind === 'video') {
+    const videoDuration = input.template.source.duration;
+    if (Number.isFinite(videoDuration) && videoDuration > 0 && videoDuration < duration) {
+      duration = videoDuration;
+    }
+  }
+
+  duration = Math.min(30, Math.max(1, duration));
 
   const stream = canvas.captureStream(30);
 
@@ -140,8 +149,8 @@ export function exportMotion(input: FrameInput, durationSeconds: number): Promis
       }
     };
 
-    if (input.media.kind === 'video' && input.media.source.paused) {
-      void input.media.source.play().catch(() => {});
+    if (input.template.kind === 'video' && input.template.source.paused) {
+      void input.template.source.play().catch(() => {});
     }
 
     drawFrame(ctx, input, width, height);

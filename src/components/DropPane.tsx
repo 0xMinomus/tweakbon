@@ -32,7 +32,7 @@ export function DropPane({
   const [internalError, setInternalError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const displayError = externalError || internalError;
+  const displayError = internalError || externalError;
 
   const handleFile = (file: File) => {
     if (validate) {
@@ -171,6 +171,7 @@ export function DropPane({
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
+                  setInternalError(null);
                   onClear();
                 }}
               >

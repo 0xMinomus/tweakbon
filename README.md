@@ -1,14 +1,16 @@
 # Tweakbon
 
-Tweakbon is a client-side web application that composites user photos or videos into Twibbon template frames. The landing view features a two-pane hero: select or drop a template on the left pane, supply personal photo or video media on the right pane, and proceed with an explicit continue action. The editor provides panning, rotation, and zooming from 50% scale (zoom-out) up to 400% before exporting.
+Tweakbon is a client-side web application that composites a user's photo into custom Twibbon template frames. The landing view features a two-pane hero: select or drop a template (PNG with transparency or video) on the left pane, supply personal photo media on the right pane, and proceed with an explicit continue action. The editor provides panning, rotation, and zooming from 50% scale (zoom-out) up to 400% before exporting.
 
-The user interface includes a custom paper-plane cursor that tracks pointer movement and fades out after 500ms of inactivity. The custom cursor falls back to native system cursors under `prefers-reduced-motion: reduce`, on touch devices lacking hover support, and over the interactive canvas stage.
+The editor header features a template switcher to replace the active template directly, while photo adjustments and replacement remain in the control panel.
+
+The interface uses a custom paper-plane cursor that tracks pointer position 1:1, unwraps its target angle, and interpolates rotation through `requestAnimationFrame` so 360-degree turns have no visual discontinuity. It falls back to native cursors under `prefers-reduced-motion: reduce`, on touch devices lacking hover support, and over the interactive canvas stage.
 
 Refer to [AGENTS.md](./AGENTS.md) for architecture rules, code conventions, and development guidelines.
 
 ## Privacy Model
 
-All media processing executes directly on the client device. Photos and videos are decoded into local memory via browser APIs (`createImageBitmap`, HTML `<video>`, and Canvas 2D). No user media is transmitted to a remote server. The application contains no analytics, telemetry, tracking pixels, or remote state storage. Network traffic is limited to fetching static web application assets and public template SVGs. Full details are documented in [docs/privacy.md](./docs/privacy.md).
+All media processing executes directly on the client device. Photos and videos are decoded into local memory via browser APIs (`createImageBitmap`, HTML `<video>`, and Canvas 2D). No user media is transmitted to a remote server. The application contains no analytics, telemetry, tracking pixels, or remote state storage. Network traffic is limited to fetching static web application assets. Full details are documented in [docs/privacy.md](./docs/privacy.md).
 
 ## Development Commands
 
@@ -24,56 +26,14 @@ npm test             # Run Vitest test suite once
 npm run test:watch   # Run Vitest in watch mode
 ```
 
-Run template catalog validation:
+## Custom Templates
 
-```bash
-node scripts/validate-templates.mjs
-```
+Templates are supplied by the user on the left pane. A template may be a transparent PNG or a video clip:
 
-## Adding a Template
-
-Templates are declarative assets stored under `public/templates/`. Adding a template does not require modifying application source code:
-
-1. Create an SVG template frame. The root `<svg>` element must declare explicit `width` and `height` attributes matching its intrinsic pixel dimensions.
-2. Cut out the transparent slot using a single `<path>` element with `fill-rule="evenodd"` that combines the outer frame perimeter with the inner cutout. Do not use SVG masks or fill opacity.
-3. Save the SVG file to `public/templates/<id>.svg`.
-4. Add the manifest entry to `public/templates/index.json`:
-
-```json
-{
-  "id": "merdeka",
-  "name": "Merdeka",
-  "kind": "image",
-  "src": "/templates/merdeka.svg",
-  "naturalWidth": 1080,
-  "naturalHeight": 1350,
-  "slot": {
-    "x": 0.125,
-    "y": 0.12,
-    "width": 0.75,
-    "height": 0.7
-  },
-  "defaultFit": "cover"
-}
-```
-
-Manifest fields:
-- `id`: Stable identifier matching the asset file stem.
-- `name`: Display name shown in template selection.
-- `kind`: Media kind, either `"image"` or `"video"`.
-- `src`: Absolute path under `public/`.
-- `naturalWidth`, `naturalHeight`: Positive integer pixel dimensions matching SVG attributes.
-- `slot`: Normalized coordinates (`x`, `y`, `width`, `height` in range `0..1`).
-- `slotPolygon`: Optional array of at least 3 normalized points for non-rectangular holes.
-- `defaultFit`: Optional initial fit mode (`"cover"` or `"contain"`).
-
-5. Validate the template catalog:
-
-```bash
-node scripts/validate-templates.mjs
-```
-
-Detailed authoring requirements are in [docs/templates.md](./docs/templates.md).
+- **Still Templates**: The app scans the alpha channel, identifies the largest contiguous transparent region, and derives the slot rectangle from its bounding box.
+- **Video Templates**: The slot is detected once from frame 0 and held constant for the entire duration of the clip. The transparent region in the video must not move relative to the frame; otherwise the slot mask drifts away from the stationary photo beneath.
+- **Contiguity**: Stray transparent pixels are ignored; only the largest connected transparent area defines the slot.
+- **Geometry**: Non-rectangular transparent cutouts are approximated by their axis-aligned bounding box.
 
 ## Repository Structure
 
@@ -87,13 +47,10 @@ src/
     render/       Canvas 2D compositor and layer ordering
     export/       Still image and video encoding
   components/     Presentational UI components and custom cursor
-  lib/            Pure math and geometry helpers
+  styles/         Design tokens, base styles, animations
   types/          Contract interfaces for editor, media, and template
-public/
-  templates/      Template SVG assets and index.json catalog
-scripts/          Validation scripts
-tests/            Vitest catalog verification and integration tests
-docs/             Architecture, template authoring, and privacy specifications
+tests/            Vitest integration tests
+docs/             Architecture and privacy specifications
 ```
 
 Architectural layers and data flow are documented in [docs/architecture.md](./docs/architecture.md).

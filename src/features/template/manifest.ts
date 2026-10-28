@@ -1,4 +1,4 @@
-import type { TemplateIndex, TemplateManifest } from '../../types/template';
+import type { TemplateManifest } from '../../types/template';
 
 export type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -134,48 +134,4 @@ export function parseManifest(input: unknown): ParseResult<TemplateManifest> {
   }
 
   return { ok: true, value: manifest };
-}
-
-export function parseTemplateIndex(input: unknown): ParseResult<TemplateIndex> {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-    return { ok: false, error: 'Template index must be an object' };
-  }
-
-  const rec = input as Record<string, unknown>;
-  if (!Array.isArray(rec.templates)) {
-    return { ok: false, error: 'Field "templates" must be an array' };
-  }
-
-  const templates: TemplateManifest[] = [];
-  const seenIds = new Set<string>();
-
-  for (let i = 0; i < rec.templates.length; i++) {
-    const parsed = parseManifest(rec.templates[i]);
-    if (!parsed.ok) {
-      return { ok: false, error: `Template at index ${i} is invalid: ${parsed.error}` };
-    }
-    if (seenIds.has(parsed.value.id)) {
-      return { ok: false, error: `Duplicate template id: "${parsed.value.id}"` };
-    }
-    seenIds.add(parsed.value.id);
-    templates.push(parsed.value);
-  }
-
-  return { ok: true, value: { templates } };
-}
-
-export async function loadTemplateIndex(
-  url = '/templates/index.json',
-): Promise<ParseResult<TemplateIndex>> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      return { ok: false, error: `Failed to load template index: HTTP ${res.status}` };
-    }
-    const json: unknown = await res.json();
-    return parseTemplateIndex(json);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: `Failed to fetch template index: ${message}` };
-  }
 }

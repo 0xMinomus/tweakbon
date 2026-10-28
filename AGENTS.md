@@ -8,7 +8,7 @@ Tweakbon is a browser tool that puts a person's photo or video into a Twibbon te
 
 - One job: composite user media into a transparent slot of a template, then export.
 - Audience is non-technical. The editor must open, auto-fit, and be adjustable in one gesture each.
-- Templates are assets, not code. Adding a template must not require a source change.
+- Templates come from the user. The slot is found by scanning the alpha channel of the uploaded file.
 - Scope discipline: the editor, the compositor, and export. No accounts, no social features, no server-rendered preview.
 
 ## Architecture & Data Flow
@@ -66,12 +66,9 @@ src/
     render/       compositor, layer order, slot clipping
     export/       PNG still, MP4/WebM motion
   components/     shared presentational UI
-  styles/         design tokens, base styles
+  styles/         design tokens, base styles, animations
   types/          shared contracts (template, media, transform)
-public/
-  templates/      three SVGs plus index.json
-scripts/          template validator (plain node, no deps)
-tests/            filesystem-level checks
+tests/            integration checks
 docs/             architecture, template authoring, privacy
 ```
 
@@ -88,7 +85,6 @@ npm run typecheck    # tsc --noEmit
 npm run lint         # ESLint
 npm test             # Vitest, single run
 npm run test:watch   # Vitest, watch
-npm run validate:templates  # node scripts/validate-templates.mjs
 ```
 
 `typecheck`, `lint`, `test`, and `build` must all pass before a change is considered done. If a script is missing, add it rather than documenting a manual equivalent.
@@ -130,10 +126,8 @@ npm run validate:templates  # node scripts/validate-templates.mjs
 | `src/types/template.ts` | `TemplateManifest`, `SlotRect`, `Point` |
 | `src/types/media.ts` | `MediaSource`, `TemplateImage` |
 | `src/types/editor.ts` | `TransformState`, `DrawSize` |
-| `public/templates/index.json` | shipped `TemplateIndex` |
-| `public/templates/*.svg` | three templates: `merdeka`, `wisuda`, `kelas` |
 
-A template manifest is the contract. Fields: `id`, `name`, `kind` (`image` | `video`), `src`, `naturalWidth`, `naturalHeight`, `slot` (`x`, `y`, `width`, `height` in normalized units), optional `slotPolygon` for non-rectangular holes, optional `defaultFit`.
+A template manifest is the contract. Fields: `id`, `name`, `kind` (`image` | `video`), `src`, `naturalWidth`, `naturalHeight`, `slot` (`x`, `y`, `width`, `height` in normalized units), optional `slotPolygon` for non-rectangular holes, optional `defaultFit`. Manifests are built at runtime from the user's file; there is no shipped catalog.
 
 ## Runtime & Tooling Preferences
 

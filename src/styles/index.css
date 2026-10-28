@@ -241,7 +241,44 @@ h1, h2, h3, h4, h5, h6 {
   border-width: 0;
 }
 
-/* Custom plane cursor */
+/* ---------- Paper-plane cursor ---------- */
+.cursor-plane {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+  will-change: transform;
+  --plane-angle: 0deg;
+}
+
+.cursor-plane-visible {
+  opacity: 1;
+}
+
+.cursor-plane svg {
+  display: block;
+  animation: planeBank 2.6s ease-in-out infinite;
+}
+
+/* Idle: the plane hovers in place instead of vanishing. */
+.cursor-plane-idle svg {
+  animation: planeFloat 3.2s ease-in-out infinite;
+}
+
+@keyframes planeBank {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  50% { transform: rotate(-3deg) translateY(-2px); }
+}
+
+@keyframes planeFloat {
+  0%, 100% { transform: rotate(-4deg) translateY(0) translateX(0); }
+  50% { transform: rotate(4deg) translateY(-6px) translateX(3px); }
+}
+
+/* The native cursor is hidden only where the plane is actually drawn. */
 html.cursor-plane-active,
 html.cursor-plane-active * {
   cursor: none !important;
@@ -258,55 +295,161 @@ html.cursor-plane-active .canvas-stage-wrapper:active {
   cursor: grabbing !important;
 }
 
-/* Keyframe animations for entrance reveal */
-@keyframes heroFadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ---------- Reveal on mount ---------- */
+@keyframes revealUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.anim-hero-title {
-  animation: heroFadeUp 320ms cubic-bezier(0.23, 1, 0.32, 1) both;
+.anim-reveal {
+  animation: revealUp 340ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
-.anim-hero-panes {
-  animation: heroFadeUp 320ms cubic-bezier(0.23, 1, 0.32, 1) 100ms both;
-}
+.anim-hero-title { animation: revealUp 340ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.anim-hero-panes { animation: revealUp 340ms cubic-bezier(0.23, 1, 0.32, 1) 90ms both; }
+.anim-hero-steps { animation: revealUp 340ms cubic-bezier(0.23, 1, 0.32, 1) 160ms both; }
 
-.anim-hero-steps {
-  animation: heroFadeUp 320ms cubic-bezier(0.23, 1, 0.32, 1) 180ms both;
-}
-
-.anim-hero-footer {
-  animation: heroFadeUp 320ms cubic-bezier(0.23, 1, 0.32, 1) 240ms both;
-}
-
-/* Drop pane lift on drag-over */
+/* ---------- Hover motion ---------- */
 .drop-pane {
   transition: transform 160ms ease-out, box-shadow 160ms ease-out, background-color 160ms ease-out;
 }
 
+.drop-pane:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
 .drop-pane-active {
-  transform: translateY(-4px) !important;
-  box-shadow: 6px 6px 0 var(--ink) !important;
+  transform: translate(-3px, -3px) !important;
+  box-shadow: 8px 8px 0 var(--ink) !important;
   background-color: var(--sky) !important;
 }
 
+.hero-pane {
+  transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+}
+
+/* ---------- Full-width footer ---------- */
+.site-footer {
+  width: 100%;
+  border-top: 3px solid var(--ink);
+  background-color: var(--paper);
+  margin-top: 48px;
+}
+
+.site-footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 24px 32px;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 32px;
+}
+
+.site-footer-logo {
+  display: inline-block;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  background-color: var(--sun);
+  border: 3px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 4px 12px;
+}
+
+.site-footer-brand p {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 12px;
+  max-width: 32ch;
+}
+
+.site-footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.site-footer-col p {
+  font-size: 14px;
+  font-weight: 600;
+  max-width: 26ch;
+}
+
+.site-footer-heading {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.site-footer-link {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: border-color 120ms ease-out, transform 120ms ease-out;
+}
+
+.site-footer-link:hover {
+  border-bottom-color: var(--ink);
+  transform: translateX(2px);
+}
+
+.site-footer-bottom {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 24px 32px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-top: 3px solid var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 860px) {
+  .site-footer-inner {
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    padding: 36px 20px 24px;
+  }
+}
+
+@media (max-width: 520px) {
+  .site-footer-inner {
+    grid-template-columns: 1fr;
+  }
+  .site-footer-bottom {
+    flex-direction: column;
+    padding: 16px 20px 32px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .anim-reveal,
   .anim-hero-title,
   .anim-hero-panes,
-  .anim-hero-steps,
-  .anim-hero-footer {
+  .anim-hero-steps {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
   }
-  .drop-pane-active {
+  .cursor-plane,
+  .cursor-plane svg {
+    animation: none !important;
+    display: none !important;
+  }
+  .drop-pane:hover,
+  .drop-pane-active,
+  .site-footer-link:hover {
     transform: none !important;
   }
 }

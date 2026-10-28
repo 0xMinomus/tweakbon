@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { MediaSource, TemplateImage } from '../types/media';
+import type { PhotoMedia, TemplateSource } from '../types/media';
 import type { TemplateManifest } from '../types/template';
 import type { TransformState } from '../types/editor';
 import {
@@ -10,11 +10,11 @@ import {
   type TransformAction,
   type TransformContext,
 } from '../features/editor/transform';
-import { loadMediaFile, loadTemplateImage, loadCustomTemplateFile } from '../features/media/load';
+import * as mediaModule from '../features/media/load';
 
 export interface EditorSession {
-  media: MediaSource | null;
-  template: TemplateImage | null;
+  media: PhotoMedia | null;
+  template: TemplateSource | null;
   manifest: TemplateManifest | null;
   transform: TransformState;
   isLoading: boolean;
@@ -22,7 +22,6 @@ export interface EditorSession {
   minScale: number;
   maxScale: number;
   setMedia: (file: File) => Promise<void>;
-  setTemplate: (manifest: TemplateManifest) => Promise<void>;
   setCustomTemplate: (file: File) => Promise<void>;
   clearTemplate: () => void;
   clearMedia: () => void;
@@ -31,16 +30,16 @@ export interface EditorSession {
 }
 
 export function useEditorSession(initialManifest?: TemplateManifest | null): EditorSession {
-  const [media, setMediaState] = useState<MediaSource | null>(null);
-  const [template, setTemplateState] = useState<TemplateImage | null>(null);
+  const [media, setMediaState] = useState<PhotoMedia | null>(null);
+  const [template, setTemplateState] = useState<TemplateSource | null>(null);
   const [manifest, setManifestState] = useState<TemplateManifest | null>(initialManifest ?? null);
   const [transform, setTransform] = useState<TransformState>(createTransform());
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Keep references to resources for idempotent cleanup
-  const mediaRef = useRef<MediaSource | null>(null);
-  const templateRef = useRef<TemplateImage | null>(null);
+  const mediaRef = useRef<PhotoMedia | null>(null);
+  const templateRef = useRef<TemplateSource | null>(null);
   const customReleaseRef = useRef<(() => void) | null>(null);
 
   // Sync refs when states change
@@ -95,61 +94,37 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     [manifest],
   );
 
-  // Set media file
+  // Set media (photo) file
   const setMedia = useCallback(
     async (file: File) => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const loadedMedia = await loadMediaFile(file);
+        type MediaLoadModule = {
+          loadPhotoFile?: (f: File) => Promise<PhotoMedia>;
+          loadMediaFile?: (f: File) => Promise<PhotoMedia>;
+        };
+        const loadModule: MediaLoadModule = mediaModule;
+        const loadPhoto = loadModule.loadPhotoFile ?? loadModule.loadMediaFile;
+        if (!loadPhoto) {
+          throw new Error('Fungsi pemuatan foto tidak tersedia');
+        }
 
-        // Release previous media
+        const loadedPhoto = await loadPhoto(file);
+
+        // Release previous photo
         if (mediaRef.current) {
           mediaRef.current.release();
         }
 
-        mediaRef.current = loadedMedia;
-        setMediaState(loadedMedia);
+        mediaRef.current = loadedPhoto;
+        setMediaState(loadedPhoto);
 
-        // Reset transform for new media
+        // Reset transform for new photo
         setTransform(createTransform());
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Gagal memuat media';
-        setError(msg);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [],
-  );
-
-  // Set template from manifest
-  const setTemplate = useCallback(
-    async (newManifest: TemplateManifest) => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const loadedTemplate = await loadTemplateImage(newManifest.src);
-
-        // Release previous template
-        if (templateRef.current) {
-          templateRef.current.release();
-        }
-        if (customReleaseRef.current) {
-          customReleaseRef.current();
-          customReleaseRef.current = null;
-        }
-
-        templateRef.current = loadedTemplate;
-        setTemplateState(loadedTemplate);
-        setManifestState(newManifest);
-
-        // Reset transform to fit new slot
-        setTransform(createTransform());
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Gagal memuat template';
+        const msg = err instanceof Error ? err.message : 'Gagal memuat foto';
         setError(msg);
       } finally {
         setIsLoading(false);
@@ -165,7 +140,7 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
       setError(null);
 
       try {
-        const custom = await loadCustomTemplateFile(file);
+        const custom = await mediaModule.loadCustomTemplateFile(file);
 
         if (templateRef.current) {
           templateRef.current.release();
@@ -174,10 +149,21 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
           customReleaseRef.current();
         }
 
-        customReleaseRef.current = custom.release;
-        templateRef.current = custom.image;
-        setTemplateState(custom.image);
-        setManifestState(custom.manifest);
+        type CustomTemplateResult = {
+          manifest: TemplateManifest;
+          release: () => void;
+          template?: TemplateSource;
+          image?: TemplateSource;
+        };
+        const result: CustomTemplateResult = custom;
+        const templateSource = result.template ?? result.image;
+        if (!templateSource) {
+          throw new Error('Gagal memproses template kustom');
+        }
+        customReleaseRef.current = result.release;
+        templateRef.current = templateSource;
+        setTemplateState(templateSource);
+        setManifestState(result.manifest);
         setTransform(createTransform());
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Gagal memproses template kustom';
@@ -220,7 +206,6 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     minScale: MIN_SCALE,
     maxScale: MAX_SCALE,
     setMedia,
-    setTemplate,
     setCustomTemplate,
     clearTemplate,
     clearMedia,

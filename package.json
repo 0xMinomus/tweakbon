@@ -10,8 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "validate:templates": "node scripts/validate-templates.mjs"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "react": "^19.3.1",

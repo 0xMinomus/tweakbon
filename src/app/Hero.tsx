@@ -1,15 +1,14 @@
 import { useRef, useEffect } from 'react';
 import type { TemplateManifest } from '../types/template';
-import type { MediaSource } from '../types/media';
+import type { PhotoMedia } from '../types/media';
 import { DropPane } from '../components/DropPane';
-import { TemplatePicker } from '../components/TemplatePicker';
 import { Button } from '../components/Button';
 
 export interface HeroProps {
-  templates: TemplateManifest[];
   manifest: TemplateManifest | null;
-  media: MediaSource | null;
-  onSelectTemplate: (template: TemplateManifest) => void;
+  media: PhotoMedia | null;
+  errorMessage?: string | null;
+  onClearError?: () => void;
   onSelectCustomTemplate: (file: File) => void;
   onClearTemplate: () => void;
   onSelectMediaFile: (file: File) => void;
@@ -17,7 +16,7 @@ export interface HeroProps {
   onProceedToEditor: () => void;
 }
 
-function MediaThumbnail({ media }: { media: MediaSource }) {
+function MediaThumbnail({ media }: { media: PhotoMedia }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -57,6 +56,8 @@ function MediaThumbnail({ media }: { media: MediaSource }) {
 }
 
 function TemplateThumbnail({ manifest }: { manifest: TemplateManifest }) {
+  const isVideo = manifest.kind === 'video';
+
   return (
     <div
       style={{
@@ -73,20 +74,31 @@ function TemplateThumbnail({ manifest }: { manifest: TemplateManifest }) {
         justifyContent: 'center',
       }}
     >
-      <img
-        src={manifest.src}
-        alt={manifest.name}
-        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-      />
+      {isVideo ? (
+        <video
+          src={manifest.src}
+          muted
+          loop
+          autoPlay
+          playsInline
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+        />
+      ) : (
+        <img
+          src={manifest.src}
+          alt={manifest.name}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+        />
+      )}
     </div>
   );
 }
 
 export function Hero({
-  templates,
   manifest,
   media,
-  onSelectTemplate,
+  errorMessage,
+  onClearError,
   onSelectCustomTemplate,
   onClearTemplate,
   onSelectMediaFile,
@@ -95,27 +107,48 @@ export function Hero({
 }: HeroProps) {
   const isReady = Boolean(manifest && media);
 
+  const handleSelectTemplate = (file: File) => {
+    onClearError?.();
+    onSelectCustomTemplate(file);
+  };
+
+  const handleClearTemplate = () => {
+    onClearError?.();
+    onClearTemplate();
+  };
+
+  const handleSelectMedia = (file: File) => {
+    onClearError?.();
+    onSelectMediaFile(file);
+  };
+
+  const handleClearMedia = () => {
+    onClearError?.();
+    onClearMedia();
+  };
+
   let disabledReason = '';
   if (!manifest && !media) {
     disabledReason = 'Isi template dan foto dulu';
   } else if (!manifest) {
     disabledReason = 'Pilih template dulu';
   } else if (!media) {
-    disabledReason = 'Pilih foto atau video dulu';
+    disabledReason = 'Pilih foto dulu';
   }
 
   const validateTemplate = (file: File) => {
-    if (file.type !== 'image/png' && !file.name.toLowerCase().endsWith('.png')) {
-      return 'Gunakan file PNG transparan untuk template.';
+    const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|avif|gif)$/i.test(file.name);
+    const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
+    if (!isImage && !isVideo) {
+      return 'Gunakan file PNG transparan atau video untuk template.';
     }
     return null;
   };
 
   const validateMedia = (file: File) => {
     const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|avif|gif)$/i.test(file.name);
-    const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
-    if (!isImage && !isVideo) {
-      return 'Gunakan file foto (JPG, PNG) atau video (MP4, WebM).';
+    if (!isImage) {
+      return 'Gunakan file foto (JPG, PNG, WebP).';
     }
     return null;
   };
@@ -169,7 +202,7 @@ export function Hero({
             opacity: 0.9,
           }}
         >
-          Pasang foto atau videomu ke dalam template twibbon langsung di peramban.
+          Pasang fotomu ke dalam template twibbon langsung di peramban.
         </p>
       </header>
 
@@ -186,27 +219,29 @@ export function Hero({
           {/* Left Pane: Template */}
           <DropPane
             title="1. Template Twibbon"
-            subtitle="Tarik file PNG transparan ke sini, atau klik untuk memilih file."
-            accept="image/png"
+            subtitle="Tarik file PNG transparan atau video ke sini, atau klik untuk memilih file."
+            accept="image/png,image/*,video/*"
             filled={Boolean(manifest)}
             previewNode={manifest ? <TemplateThumbnail manifest={manifest} /> : undefined}
             infoText={manifest?.name}
-            onSelectFile={onSelectCustomTemplate}
-            onClear={onClearTemplate}
+            onSelectFile={handleSelectTemplate}
+            onClear={handleClearTemplate}
             validate={validateTemplate}
+            errorMessage={errorMessage}
           />
 
-          {/* Right Pane: Photo / Video */}
+          {/* Right Pane: Photo */}
           <DropPane
-            title="2. Foto atau Video"
-            subtitle="Tarik foto atau video ke sini, atau klik untuk memilih file."
-            accept="image/*,video/*"
+            title="2. Foto"
+            subtitle="Tarik foto ke sini, atau klik untuk memilih file."
+            accept="image/*"
             filled={Boolean(media)}
             previewNode={media ? <MediaThumbnail media={media} /> : undefined}
-            infoText={media ? (media.kind === 'video' ? 'Video terpasang' : 'Foto terpasang') : undefined}
-            onSelectFile={onSelectMediaFile}
-            onClear={onClearMedia}
+            infoText={media ? 'Foto terpasang' : undefined}
+            onSelectFile={handleSelectMedia}
+            onClear={handleClearMedia}
             validate={validateMedia}
+            errorMessage={errorMessage}
           />
         </div>
 
@@ -239,19 +274,8 @@ export function Hero({
         </div>
       </section>
 
-      {/* Shipped templates strip below panes */}
-      {templates.length > 0 && (
-        <section aria-label="Pilihan template siap pakai" style={{ marginTop: '8px' }}>
-          <TemplatePicker
-            templates={templates}
-            selectedTemplateId={manifest?.id ?? null}
-            onSelectTemplate={onSelectTemplate}
-          />
-        </section>
-      )}
-
       {/* Three-item landing flow explanation */}
-      <section aria-label="Alur kerja" className="anim-hero-steps" style={{ marginTop: '16px' }}>
+      <section id="alur" aria-label="Alur kerja" className="anim-hero-steps" style={{ marginTop: '16px' }}>
         <div
           style={{
             display: 'grid',
@@ -282,7 +306,7 @@ export function Hero({
             </span>
             <h3 style={{ fontSize: '18px', margin: '12px 0 6px' }}>PILIH TEMPLATE</h3>
             <p style={{ fontSize: '14px', fontWeight: 600, opacity: 0.85, lineHeight: 1.5 }}>
-              Gunakan template siap pakai dari daftar atau unggah file PNG transparan milikmu sendiri.
+              Unggah file PNG transparan atau video milikmu sendiri untuk template twibbon.
             </p>
           </div>
 
@@ -309,7 +333,7 @@ export function Hero({
             </span>
             <h3 style={{ fontSize: '18px', margin: '12px 0 6px' }}>PASANG FOTO</h3>
             <p style={{ fontSize: '14px', fontWeight: 600, opacity: 0.85, lineHeight: 1.5 }}>
-              Tarik foto atau video favoritmu, lalu sesuaikan posisi dan ukurannya dengan mudah.
+              Tarik foto favoritmu, lalu sesuaikan posisi dan ukurannya dengan mudah.
             </p>
           </div>
 
@@ -341,46 +365,6 @@ export function Hero({
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer
-        className="anim-hero-footer"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '12px',
-          paddingTop: '32px',
-          paddingBottom: '24px',
-          borderTop: '3px solid var(--ink)',
-          marginTop: '24px',
-          textAlign: 'center',
-        }}
-      >
-        <span style={{ fontSize: '20px', fontWeight: 900, letterSpacing: '-0.02em' }}>
-          TWEAKBON
-        </span>
-        <p style={{ fontSize: '14px', fontWeight: 700 }}>
-          File diproses di perangkatmu. Tidak ada yang dikirim ke server.
-        </p>
-        <a
-          href="#top"
-          onClick={(e) => {
-            e.preventDefault();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          style={{
-            fontSize: '13px',
-            fontWeight: 800,
-            color: 'var(--ink)',
-            textDecoration: 'underline',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-          }}
-        >
-          Kembali ke atas
-        </a>
-      </footer>
     </div>
   );
 }

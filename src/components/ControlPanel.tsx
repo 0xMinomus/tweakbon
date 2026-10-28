@@ -7,6 +7,7 @@ export interface ControlPanelProps {
   maxScale: number;
   rotation: number;
   flipX: boolean;
+  templateKind?: 'image' | 'video';
   mediaKind?: 'image' | 'video';
   isExporting: boolean;
   isUncovered?: boolean;
@@ -17,7 +18,8 @@ export interface ControlPanelProps {
   onReset: () => void;
   onDownloadStill: () => void;
   onDownloadMotion?: () => void;
-  onChangeMedia: () => void;
+  onChangeMedia?: () => void;
+  onChangePhoto?: () => void;
   className?: string;
 }
 
@@ -27,6 +29,7 @@ export function ControlPanel({
   maxScale,
   rotation,
   flipX,
+  templateKind,
   mediaKind = 'image',
   isExporting,
   isUncovered = false,
@@ -38,10 +41,13 @@ export function ControlPanel({
   onDownloadStill,
   onDownloadMotion,
   onChangeMedia,
+  onChangePhoto,
   className = '',
 }: ControlPanelProps) {
   const hasMediaRecorder = typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined';
-  const showVideoDownload = mediaKind === 'video' && hasMediaRecorder && Boolean(onDownloadMotion);
+  const effectiveTemplateKind = templateKind ?? mediaKind;
+  const showVideoDownload = effectiveTemplateKind === 'video' && hasMediaRecorder && Boolean(onDownloadMotion);
+  const handleChangePhoto = onChangePhoto ?? onChangeMedia;
 
   const handleSliderChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
@@ -248,11 +254,11 @@ export function ControlPanel({
           type="button"
           variant="secondary"
           size="md"
-          onClick={onChangeMedia}
+          onClick={handleChangePhoto}
           disabled={isExporting}
           style={{ width: '100%' }}
         >
-          Ganti foto atau video
+          Ganti foto
         </Button>
       </div>
 

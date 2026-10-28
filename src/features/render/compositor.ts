@@ -1,11 +1,11 @@
-import type { MediaSource, TemplateImage } from '../../types/media';
+import type { PhotoMedia, TemplateSource } from '../../types/media';
 import type { TemplateManifest } from '../../types/template';
 import type { TransformState } from '../../types/editor';
 import { drawSizeInSlot, isUncovered } from '../editor/transform';
 
 export interface FrameInput {
-  template: TemplateImage;
-  media: MediaSource;
+  template: TemplateSource;
+  media: PhotoMedia;
   manifest: TemplateManifest;
   transform: TransformState;
 }
@@ -22,10 +22,7 @@ export function drawFrame(
 
   ctx.clearRect(0, 0, outputWidth, outputHeight);
 
-  const isVideo = media.kind === 'video';
-  const skipMedia = isVideo && media.source.readyState < 2;
-
-  if (!skipMedia && media.width > 0 && media.height > 0) {
+  if (media.width > 0 && media.height > 0) {
     const slot = manifest.slot;
     const slotX = slot.x * outputWidth;
     const slotY = slot.y * outputHeight;
@@ -80,5 +77,10 @@ export function drawFrame(
     ctx.restore();
   }
 
-  ctx.drawImage(template.source, 0, 0, outputWidth, outputHeight);
+  const isVideoTemplate = template.kind === 'video';
+  const skipTemplate = isVideoTemplate && template.source.readyState < 2;
+
+  if (!skipTemplate) {
+    ctx.drawImage(template.source, 0, 0, outputWidth, outputHeight);
+  }
 }

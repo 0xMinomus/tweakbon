@@ -1,64 +1,34 @@
-import { useState, useEffect } from 'react';
-import type { TemplateManifest } from '../types/template';
-import { loadTemplateIndex } from '../features/template/manifest';
+import { useState } from 'react';
 import { useEditorSession } from './useEditorSession';
 import { Hero } from './Hero';
 import { Editor } from './Editor';
 import { PlaneCursor } from '../components/PlaneCursor';
+import { SiteFooter } from '../components/SiteFooter';
 
 export function App() {
   const [view, setView] = useState<'hero' | 'editor'>('hero');
-  const [templates, setTemplates] = useState<TemplateManifest[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateManifest | null>(null);
-
-  const session = useEditorSession(selectedTemplate);
-  const { setTemplate, clearTemplate, clearMedia, setMedia, setCustomTemplate } = session;
-
-  // Effect A: load template index on mount (NO auto-select)
-  useEffect(() => {
-    let isMounted = true;
-
-    void loadTemplateIndex().then((res) => {
-      if (!isMounted) return;
-      if (res.ok && res.value.templates.length > 0) {
-        setTemplates(res.value.templates);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Effect B: load template into session when selectedTemplate changes
-  useEffect(() => {
-    if (selectedTemplate) {
-      void setTemplate(selectedTemplate);
-    }
-  }, [selectedTemplate, setTemplate]);
-
-  const handleSelectTemplate = (tpl: TemplateManifest) => {
-    setSelectedTemplate(tpl);
-  };
+  const session = useEditorSession(null);
+  const { clearTemplate, clearMedia, setMedia, setCustomTemplate, error, clearError } = session;
 
   const handleSelectCustomTemplate = (file: File) => {
-    setSelectedTemplate(null);
+    clearError();
     void setCustomTemplate(file);
   };
 
   const handleClearTemplate = () => {
-    setSelectedTemplate(null);
+    clearError();
     clearTemplate();
   };
 
   const handleSelectMediaFile = (file: File) => {
+    clearError();
     void setMedia(file);
   };
 
   const handleClearMedia = () => {
+    clearError();
     clearMedia();
   };
-
   const handleProceedToEditor = () => {
     if (session.manifest && session.media) {
       setView('editor');
@@ -66,6 +36,7 @@ export function App() {
   };
 
   const handleBack = () => {
+    clearError();
     setView('hero');
   };
 
@@ -75,10 +46,10 @@ export function App() {
       <main style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {view === 'hero' ? (
           <Hero
-            templates={templates}
             manifest={session.manifest}
             media={session.media}
-            onSelectTemplate={handleSelectTemplate}
+            errorMessage={error}
+            onClearError={clearError}
             onSelectCustomTemplate={handleSelectCustomTemplate}
             onClearTemplate={handleClearTemplate}
             onSelectMediaFile={handleSelectMediaFile}
@@ -86,9 +57,10 @@ export function App() {
             onProceedToEditor={handleProceedToEditor}
           />
         ) : (
-          <Editor session={session} templates={templates} onBack={handleBack} />
+          <Editor session={session} onBack={handleBack} />
         )}
       </main>
+      <SiteFooter />
     </>
   );
 }

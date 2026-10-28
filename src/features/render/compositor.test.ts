@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { drawFrame, type FrameInput } from './compositor';
-import type { MediaSource, TemplateImage } from '../../types/media';
+import type { PhotoMedia, TemplateImage, TemplateVideo } from '../../types/media';
 import type { TemplateManifest } from '../../types/template';
 import type { TransformState } from '../../types/editor';
 
@@ -68,14 +68,14 @@ const fakeTemplateSource = {} as ImageBitmap;
 const fakeMediaSource = {} as ImageBitmap;
 
 const baseTemplate: TemplateImage = {
+  kind: 'image',
   source: fakeTemplateSource,
   width: 1000,
   height: 1000,
   release: () => {},
 };
 
-const baseMedia: MediaSource = {
-  kind: 'image',
+const baseMedia: PhotoMedia = {
   source: fakeMediaSource,
   width: 800,
   height: 600,
@@ -174,11 +174,11 @@ describe('compositor drawFrame', () => {
     expect(lineToCalls[1].args).toEqual([500, 800]);
   });
 
-  it('skips media draw and still draws template when video readyState is 0', () => {
+  it('skips template draw and still draws photo when video template readyState is 0', () => {
     const ctx = createRecordingContext();
     const fakeVideo = { readyState: 0 } as HTMLVideoElement;
 
-    const videoMedia: MediaSource = {
+    const videoTemplate: TemplateVideo = {
       kind: 'video',
       source: fakeVideo,
       width: 1920,
@@ -187,8 +187,8 @@ describe('compositor drawFrame', () => {
     };
 
     const input: FrameInput = {
-      template: baseTemplate,
-      media: videoMedia,
+      template: videoTemplate,
+      media: baseMedia,
       manifest: baseManifest,
       transform: defaultTransform,
     };
@@ -197,17 +197,28 @@ describe('compositor drawFrame', () => {
 
     const drawCalls = ctx.calls.filter((c) => c.method === 'drawImage');
     expect(drawCalls).toHaveLength(1);
-    expect(drawCalls[0].args).toEqual([fakeTemplateSource, 0, 0, 600, 600]);
+    expect(drawCalls[0].args[0]).toBe(fakeMediaSource);
 
     const methods = ctx.calls.map((c) => c.method);
-    expect(methods).toEqual(['clearRect', 'drawImage']);
+    expect(methods).toEqual([
+      'clearRect',
+      'save',
+      'beginPath',
+      'rect',
+      'clip',
+      'translate',
+      'rotate',
+      'scale',
+      'drawImage',
+      'restore',
+    ]);
   });
 
-  it('draws media when video readyState is 2 or higher', () => {
+  it('draws both photo and template when video template readyState is 2 or higher', () => {
     const ctx = createRecordingContext();
     const fakeVideo = { readyState: 2 } as HTMLVideoElement;
 
-    const videoMedia: MediaSource = {
+    const videoTemplate: TemplateVideo = {
       kind: 'video',
       source: fakeVideo,
       width: 1280,
@@ -216,8 +227,8 @@ describe('compositor drawFrame', () => {
     };
 
     const input: FrameInput = {
-      template: baseTemplate,
-      media: videoMedia,
+      template: videoTemplate,
+      media: baseMedia,
       manifest: baseManifest,
       transform: defaultTransform,
     };
@@ -226,8 +237,8 @@ describe('compositor drawFrame', () => {
 
     const drawCalls = ctx.calls.filter((c) => c.method === 'drawImage');
     expect(drawCalls).toHaveLength(2);
-    expect(drawCalls[0].args[0]).toBe(fakeVideo);
-    expect(drawCalls[1].args).toEqual([fakeTemplateSource, 0, 0, 400, 400]);
+    expect(drawCalls[0].args[0]).toBe(fakeMediaSource);
+    expect(drawCalls[1].args).toEqual([fakeVideo, 0, 0, 400, 400]);
   });
 
   it('applies rotation, flipX, and translation transform', () => {

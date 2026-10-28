@@ -1,20 +1,17 @@
 import { useState, useRef, type ChangeEvent } from 'react';
-import type { TemplateManifest } from '../types/template';
 import type { EditorSession } from './useEditorSession';
 import { exportStill, exportMotion } from '../features/export/export';
 import { isUncovered, drawSizeInSlot } from '../features/editor/transform';
 import { CanvasStage } from '../components/CanvasStage';
 import { ControlPanel } from '../components/ControlPanel';
-import { TemplatePicker } from '../components/TemplatePicker';
 import { Button } from '../components/Button';
 
 export interface EditorProps {
   session: EditorSession;
-  templates: TemplateManifest[];
   onBack: () => void;
 }
 
-export function Editor({ session, templates, onBack }: EditorProps) {
+export function Editor({ session, onBack }: EditorProps) {
   const {
     media,
     template,
@@ -25,14 +22,15 @@ export function Editor({ session, templates, onBack }: EditorProps) {
     minScale,
     maxScale,
     setMedia,
-    setTemplate,
     setCustomTemplate,
     dispatchTransform,
   } = session;
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+
+  const templateInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const uncovered = (() => {
     if (!media || !manifest) return false;
@@ -41,13 +39,24 @@ export function Editor({ session, templates, onBack }: EditorProps) {
     const draw = drawSizeInSlot(media.width, media.height, slotAspect, transform.scale);
     return isUncovered(transform, draw);
   })();
-  const mediaInputRef = useRef<HTMLInputElement>(null);
 
-  const handleChangeMediaClick = () => {
-    mediaInputRef.current?.click();
+  const handleHeaderChangeTemplateClick = () => {
+    templateInputRef.current?.click();
   };
 
-  const handleMediaInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleTemplateInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      void setCustomTemplate(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleChangePhotoClick = () => {
+    photoInputRef.current?.click();
+  };
+
+  const handlePhotoInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       void setMedia(file);
@@ -143,24 +152,27 @@ export function Editor({ session, templates, onBack }: EditorProps) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Button
-            type="button"
-            variant="sky"
-            size="sm"
-            onClick={() => setShowTemplatePicker((prev) => !prev)}
-          >
-            {showTemplatePicker ? 'Tutup pilihan template' : 'Ganti template'}
+          <Button type="button" variant="sky" size="sm" onClick={handleHeaderChangeTemplateClick}>
+            Ganti template
           </Button>
         </div>
       </header>
 
-      {/* Hidden file input for changing photo/video */}
+      {/* Hidden file inputs for changing template and photo */}
       <input
-        ref={mediaInputRef}
+        ref={templateInputRef}
         type="file"
-        accept="image/*,video/*"
+        accept="image/png,image/*,video/*"
         className="sr-only"
-        onChange={handleMediaInputChange}
+        onChange={handleTemplateInputChange}
+        tabIndex={-1}
+      />
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={handlePhotoInputChange}
         tabIndex={-1}
       />
 
@@ -180,32 +192,6 @@ export function Editor({ session, templates, onBack }: EditorProps) {
           }}
         >
           {error || exportError}
-        </div>
-      )}
-
-      {/* Optional template picker panel in editor */}
-      {showTemplatePicker && (
-        <div
-          style={{
-            padding: '20px',
-            border: '3px solid var(--ink)',
-            borderRadius: 'var(--radius)',
-            boxShadow: '4px 4px 0 var(--ink)',
-            backgroundColor: '#FFFFFF',
-          }}
-        >
-          <TemplatePicker
-            templates={templates}
-            selectedTemplateId={manifest?.id ?? null}
-            onSelectTemplate={(tpl) => {
-              void setTemplate(tpl);
-              setShowTemplatePicker(false);
-            }}
-            onSelectCustomFile={(file) => {
-              void setCustomTemplate(file);
-              setShowTemplatePicker(false);
-            }}
-          />
         </div>
       )}
 
@@ -257,7 +243,7 @@ export function Editor({ session, templates, onBack }: EditorProps) {
             maxScale={maxScale}
             rotation={transform.rotation}
             flipX={transform.flipX}
-            mediaKind={media?.kind}
+            templateKind={manifest?.kind}
             isExporting={isExporting}
             onZoom={(newScale) => dispatchTransform({ type: 'scale', scale: newScale })}
             onFit={() => dispatchTransform({ type: 'scale', scale: 1 })}
@@ -266,8 +252,8 @@ export function Editor({ session, templates, onBack }: EditorProps) {
             onFlip={() => dispatchTransform({ type: 'flip' })}
             onReset={() => dispatchTransform({ type: 'reset' })}
             onDownloadStill={handleDownloadStill}
-            onDownloadMotion={media?.kind === 'video' ? handleDownloadMotion : undefined}
-            onChangeMedia={handleChangeMediaClick}
+            onDownloadMotion={manifest?.kind === 'video' ? handleDownloadMotion : undefined}
+            onChangePhoto={handleChangePhotoClick}
           />
         </section>
       </div>

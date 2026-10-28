@@ -6,14 +6,14 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { drawFrame } from '../features/render/compositor';
-import type { MediaSource, TemplateImage } from '../types/media';
+import type { PhotoMedia, TemplateSource } from '../types/media';
 import type { TemplateManifest } from '../types/template';
 import type { TransformState } from '../types/editor';
 import type { TransformAction } from '../features/editor/transform';
 
 export interface CanvasStageProps {
-  template: TemplateImage;
-  media: MediaSource;
+  template: TemplateSource;
+  media: PhotoMedia;
   manifest: TemplateManifest;
   transform: TransformState;
   onAction: (action: TransformAction) => void;
@@ -76,7 +76,7 @@ export function CanvasStage({
         );
       }
 
-      if (media.kind === 'video') {
+      if (template.kind === 'video') {
         animId = requestAnimationFrame(render);
       }
     };

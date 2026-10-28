@@ -1,97 +1,129 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
+
+const IDLE_DELAY_MS = 500;
+const LERP_FACTOR = 0.25;
+/** Hard ceiling on rotation per animation frame, in degrees. */
+const MAX_STEP_DEG = 9;
 
 export function PlaneCursor() {
-  const [visible, setVisible] = useState(false);
-  const [position, setPosition] = useState<{ x: number; y: number; angle: number }>({
-    x: -100,
-    y: -100,
-    angle: 0,
-  });
-
-  const lastPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const idleTimerRef = useRef<number | null>(null);
+  const planeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Check constraints: hover capability and reduced motion
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const hoverSupported = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (reduced || !finePointer) return;
 
-    if (prefersReducedMotion || !hoverSupported) {
-      return;
-    }
+    const plane = planeRef.current;
+    if (!plane) return;
 
-    const handlePointerMove = (e: PointerEvent) => {
-      // If inside canvas stage, keep native grab/grabbing cursor
-      const target = e.target as Element | null;
-      if (target?.closest('canvas, .canvas-stage-wrapper')) {
-        if (visible) {
-          setVisible(false);
-          document.documentElement.classList.remove('cursor-plane-active');
-        }
+    const root = document.documentElement;
+    let idleTimer: number | null = null;
+    let rafId: number | null = null;
+
+    let lastX = 0;
+    let lastY = 0;
+    let posX = 0;
+    let posY = 0;
+
+    let renderedAngle = 0;
+    let targetAngle = 0;
+    let shown = false;
+
+    const applyTransform = () => {
+      plane.style.transform = `translate3d(${posX}px, ${posY}px, 0) translate(-50%, -50%) rotate(${renderedAngle}deg)`;
+    };
+
+    const show = () => {
+      if (shown) return;
+      shown = true;
+      plane.classList.add('cursor-plane-visible');
+      root.classList.add('cursor-plane-active');
+    };
+
+    const hide = () => {
+      if (!shown) return;
+      shown = false;
+      plane.classList.remove('cursor-plane-visible');
+      root.classList.remove('cursor-plane-active');
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    };
+
+    const tick = () => {
+      const remainingDelta = targetAngle - renderedAngle;
+      if (Math.abs(remainingDelta) < 0.1) {
+        renderedAngle = targetAngle;
+        applyTransform();
+        rafId = null;
         return;
       }
 
-      const dx = e.clientX - lastPosRef.current.x;
-      const dy = e.clientY - lastPosRef.current.y;
-      lastPosRef.current = { x: e.clientX, y: e.clientY };
-
-      // Calculate travel angle if moved significantly
-      let angle = position.angle;
-      if (Math.hypot(dx, dy) > 1) {
-        // SVG plane tip points at -45deg, so add 45 to orient along velocity
-        angle = (Math.atan2(dy, dx) * 180) / Math.PI + 45;
-      }
-
-      setPosition({ x: e.clientX, y: e.clientY, angle });
-      setVisible(true);
-      document.documentElement.classList.add('cursor-plane-active');
-
-      // Clear existing idle timer
-      if (idleTimerRef.current !== null) {
-        window.clearTimeout(idleTimerRef.current);
-      }
-
-      // Fade out after 500ms idle
-      idleTimerRef.current = window.setTimeout(() => {
-        setVisible(false);
-        document.documentElement.classList.remove('cursor-plane-active');
-      }, 500);
+      // Bound the per-frame step: a plain 25% lerp of a large delta (a sharp
+      // direction change) still snaps ~85deg in one frame, which reads as a
+      // break. Constant-speed catch-up keeps every turn continuous.
+      const eased = remainingDelta * LERP_FACTOR;
+      const step = Math.max(-MAX_STEP_DEG, Math.min(MAX_STEP_DEG, eased));
+      renderedAngle += step;
+      applyTransform();
+      rafId = requestAnimationFrame(tick);
     };
 
-    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    const startRafLoop = () => {
+      if (rafId === null) {
+        rafId = requestAnimationFrame(tick);
+      }
+    };
+
+    const onMove = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (target?.closest('canvas, .canvas-stage-wrapper')) {
+        hide();
+        return;
+      }
+
+      posX = event.clientX;
+      posY = event.clientY;
+      plane.classList.remove('cursor-plane-idle');
+
+      const dx = event.clientX - lastX;
+      const dy = event.clientY - lastY;
+      lastX = event.clientX;
+      lastY = event.clientY;
+
+      if (Math.hypot(dx, dy) >= 1) {
+        const rawTarget = (Math.atan2(dy, dx) * 180) / Math.PI + 45;
+        const delta = ((rawTarget - renderedAngle + 540) % 360) - 180;
+        targetAngle = renderedAngle + delta;
+        startRafLoop();
+      }
+      // Pointer position stays 1:1 immediately
+      applyTransform();
+      show();
+
+      if (idleTimer !== null) window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(() => {
+        plane.classList.add('cursor-plane-idle');
+      }, IDLE_DELAY_MS);
+    };
+
+    window.addEventListener('pointermove', onMove, { passive: true });
+    document.addEventListener('pointerleave', hide);
+    window.addEventListener('blur', hide);
 
     return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      if (idleTimerRef.current !== null) {
-        window.clearTimeout(idleTimerRef.current);
-      }
-      document.documentElement.classList.remove('cursor-plane-active');
+      window.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerleave', hide);
+      window.removeEventListener('blur', hide);
+      if (idleTimer !== null) window.clearTimeout(idleTimer);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      root.classList.remove('cursor-plane-active');
     };
-  }, [visible, position.angle]);
-
-  // When not visible or on unmount, ensure cursor style removed
-  useEffect(() => {
-    if (!visible) {
-      document.documentElement.classList.remove('cursor-plane-active');
-    }
-  }, [visible]);
+  }, []);
 
   return (
-    <div
-      className="cursor-plane"
-      aria-hidden="true"
-      style={{
-        position: 'fixed',
-        left: 0,
-        top: 0,
-        pointerEvents: 'none',
-        zIndex: 9999,
-        transform: `translate3d(${position.x}px, ${position.y}px, 0) translate(-50%, -50%) rotate(${position.angle}deg)`,
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 200ms ease-out',
-        willChange: visible ? 'transform, opacity' : 'auto',
-      }}
-    >
+    <div ref={planeRef} className="cursor-plane" aria-hidden="true">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
         <path
           d="M22 2L15 22L11 13L2 9L22 2Z"

@@ -1,5 +1,3 @@
-import type { SlotRect } from './template';
-
 /**
  * Media contract. Owned by the orchestrator.
  *
@@ -62,11 +60,3 @@ export interface TemplateVideo {
 }
 
 export type TemplateSource = TemplateImage | TemplateVideo;
-
-/** The decoded template the compositor draws on top, plus its own slot. */
-export interface LoadedTemplate {
-  template: TemplateSource;
-  slot: SlotRect;
-  naturalWidth: number;
-  naturalHeight: number;
-}

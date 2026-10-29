@@ -118,39 +118,6 @@ export async function loadVideoFile(file: File): Promise<VideoMedia> {
   }
 }
 
-export async function loadTemplateImage(src: string): Promise<TemplateImage> {
-  const response = await fetch(src);
-  if (!response.ok) {
-    throw new Error(`Gagal memuat template: ${response.status} ${response.statusText}`);
-  }
-
-  const blob = await response.blob();
-  const bitmap = await createImageBitmap(blob).catch(async () => {
-    const url = URL.createObjectURL(blob);
-    try {
-      const img = new Image();
-      img.src = url;
-      await img.decode();
-      return await createImageBitmap(img);
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  });
-
-  let released = false;
-  return {
-    kind: 'image',
-    source: bitmap,
-    width: bitmap.width,
-    height: bitmap.height,
-    release: () => {
-      if (released) return;
-      released = true;
-      bitmap.close();
-    },
-  };
-}
-
 export interface CustomTemplate {
   manifest: TemplateManifest;
   template: TemplateSource;

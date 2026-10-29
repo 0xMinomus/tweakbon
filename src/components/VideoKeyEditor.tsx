@@ -4,17 +4,15 @@ import {
   useEffect,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import type { VideoMedia } from '../types/media';
-import type { ChromaKeySettings, VideoTrim, Rgb } from '../types/editor';
+import type { TemplateVideo } from '../types/media';
+import type { ChromaKeySettings, Rgb } from '../types/editor';
 import { drawKeyedVideoFrame } from '../features/render/keying';
 import { Button } from './Button';
 
 export interface VideoKeyEditorProps {
-  media: VideoMedia;
+  template: TemplateVideo;
   chroma: ChromaKeySettings;
-  trim: VideoTrim;
   onChangeChroma: (next: ChromaKeySettings) => void;
-  onChangeTrim: (next: VideoTrim) => void;
   onClose: () => void;
   className?: string;
 }
@@ -24,86 +22,47 @@ function rgbToHex(color: Rgb): string {
   return `#${toHex(color.r)}${toHex(color.g)}${toHex(color.b)}`.toUpperCase();
 }
 
-function formatTime(sec: number): string {
-  const totalSec = Math.max(0, Math.floor(sec));
-  const m = Math.floor(totalSec / 60);
-  const s = Math.floor(totalSec % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
 
 export function VideoKeyEditor({
-  media,
+  template,
   chroma,
-  trim,
   onChangeChroma,
-  onChangeTrim,
   onClose,
   className = '',
 }: VideoKeyEditorProps) {
   const [isEyedropper, setIsEyedropper] = useState<boolean>(false);
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
-  const [currentTimeDisplay, setCurrentTimeDisplay] = useState<number>(trim.start);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const trimRef = useRef<VideoTrim>(trim);
   const chromaRef = useRef<ChromaKeySettings>(chroma);
-
-  useEffect(() => {
-    trimRef.current = trim;
-  }, [trim]);
-
   useEffect(() => {
     chromaRef.current = chroma;
   }, [chroma]);
 
-  // Ensure video is playing and muted
+  // Ensure template video is playing, muted, and looping
   useEffect(() => {
-    const video = media.source;
+    const video = template.source;
     video.muted = true;
-    const currentTrim = trimRef.current;
-    if (video.currentTime < currentTrim.start || video.currentTime >= currentTrim.end) {
-      video.currentTime = currentTrim.start;
-    }
-    void video.play().then(() => {
-      setIsPlaying(true);
-    }).catch(() => {
-      setIsPlaying(false);
-    });
-  }, [media]);
-
-  // rAF loop to draw keyed frames and track trim window
+    video.loop = true;
+    void video.play().catch(() => {});
+  }, [template]);
+  // rAF loop to draw keyed frames
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = media.width;
-    canvas.height = media.height;
+    canvas.width = template.width;
+    canvas.height = template.height;
 
     let animId: number | null = null;
     let isMounted = true;
-    let lastTimeUpdate = 0;
 
     const render = () => {
       if (!isMounted) return;
 
-      const video = media.source;
-      const currentTrim = trimRef.current;
+      const video = template.source;
       const currentChroma = chromaRef.current;
-
-      const start = currentTrim.start;
-      const end = currentTrim.end;
-
-      if (video.currentTime >= end || video.currentTime < start) {
-        video.currentTime = start;
-      }
-
-      const now = performance.now();
-      if (now - lastTimeUpdate > 80) {
-        setCurrentTimeDisplay(video.currentTime);
-        lastTimeUpdate = now;
-      }
 
       drawKeyedVideoFrame(ctx, video, currentChroma, 0, 0, canvas.width, canvas.height);
 
@@ -118,18 +77,8 @@ export function VideoKeyEditor({
         cancelAnimationFrame(animId);
       }
     };
-  }, [media]);
+  }, [template]);
 
-  const togglePlay = () => {
-    const video = media.source;
-    if (video.paused) {
-      void video.play().catch(() => {});
-      setIsPlaying(true);
-    } else {
-      video.pause();
-      setIsPlaying(false);
-    }
-  };
 
   const handleCanvasPointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     if (!isEyedropper) return;
@@ -144,9 +93,9 @@ export function VideoKeyEditor({
 
     // Helper canvas bounded to <= 640px for reading pixel color
     const maxDim = 640;
-    const scale = Math.min(1, maxDim / Math.max(media.width, media.height));
-    const hw = Math.max(1, Math.round(media.width * scale));
-    const hh = Math.max(1, Math.round(media.height * scale));
+    const scale = Math.min(1, maxDim / Math.max(template.width, template.height));
+    const hw = Math.max(1, Math.round(template.width * scale));
+    const hh = Math.max(1, Math.round(template.height * scale));
 
     const helper = document.createElement('canvas');
     helper.width = hw;
@@ -154,7 +103,7 @@ export function VideoKeyEditor({
     const hctx = helper.getContext('2d', { willReadFrequently: true });
     if (!hctx) return;
 
-    hctx.drawImage(media.source, 0, 0, hw, hh);
+    hctx.drawImage(template.source, 0, 0, hw, hh);
 
     const sampleX = Math.max(0, Math.min(hw - 1, Math.round((cssX / rect.width) * hw)));
     const sampleY = Math.max(0, Math.min(hh - 1, Math.round((cssY / rect.height) * hh)));
@@ -174,23 +123,6 @@ export function VideoKeyEditor({
     setIsEyedropper(false);
   };
 
-  const handleStartChange = (val: number) => {
-    const safeVal = Math.max(0, Math.min(val, trim.end - 0.2));
-    const rounded = Math.round(safeVal * 10) / 10;
-    onChangeTrim({ start: rounded, end: trim.end });
-    if (media.source.currentTime < rounded) {
-      media.source.currentTime = rounded;
-    }
-  };
-
-  const handleEndChange = (val: number) => {
-    const safeVal = Math.min(media.duration, Math.max(val, trim.start + 0.2));
-    const rounded = Math.round(safeVal * 10) / 10;
-    onChangeTrim({ start: trim.start, end: rounded });
-    if (media.source.currentTime >= rounded) {
-      media.source.currentTime = trim.start;
-    }
-  };
 
   const colorHex = rgbToHex(chroma.color);
 
@@ -210,20 +142,7 @@ export function VideoKeyEditor({
     >
       {/* Title */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ fontSize: '15px', fontWeight: 900 }}>Edit Latar & Klip Video</h3>
-        <span
-          style={{
-            fontSize: '13px',
-            fontWeight: 800,
-            backgroundColor: 'var(--sky)',
-            border: '2px solid var(--ink)',
-            borderRadius: 'var(--radius)',
-            padding: '2px 8px',
-            boxShadow: '2px 2px 0 var(--ink)',
-          }}
-        >
-          {formatTime(currentTimeDisplay)} / {formatTime(media.duration)}
-        </span>
+        <h3 style={{ fontSize: '15px', fontWeight: 900 }}>Hapus Latar Template</h3>
       </div>
 
       {/* Video Preview Canvas with Checkerboard Background */}
@@ -239,19 +158,18 @@ export function VideoKeyEditor({
           overflow: 'hidden',
           touchAction: 'none',
           position: 'relative',
-          cursor: isEyedropper ? 'crosshair' : 'default',
         }}
       >
         <canvas
           ref={canvasRef}
           role="img"
-          aria-label="Pratinjau video dengan hapus latar"
+          aria-label="Pratinjau template video dengan hapus latar"
           onPointerDown={handleCanvasPointerDown}
           style={{
             width: '100%',
             height: 'auto',
             display: 'block',
-            aspectRatio: `${media.width} / ${media.height}`,
+            aspectRatio: `${template.width} / ${template.height}`,
           }}
         />
         {isEyedropper && (
@@ -272,7 +190,7 @@ export function VideoKeyEditor({
               pointerEvents: 'none',
             }}
           >
-            Klik pada video untuk mengambil warna latar
+            Klik pada template untuk mengambil warna latar
           </div>
         )}
       </div>
@@ -307,7 +225,7 @@ export function VideoKeyEditor({
             variant={isEyedropper ? 'sun' : 'secondary'}
             aria-pressed={isEyedropper}
             onClick={() => setIsEyedropper(!isEyedropper)}
-            aria-label="Ambil warna latar dari video"
+            aria-label="Ambil warna latar dari template"
           >
             {isEyedropper ? 'Membatalkan' : 'Ambil warna latar'}
           </Button>
@@ -402,72 +320,6 @@ export function VideoKeyEditor({
         </div>
       </div>
 
-      {/* Video Trim Controls */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
-          backgroundColor: 'var(--paper)',
-          border: '2px solid var(--ink)',
-          borderRadius: 'var(--radius)',
-          padding: '12px',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', fontWeight: 900, textTransform: 'uppercase' }}>Potong Klip</span>
-          <Button
-            type="button"
-            size="sm"
-            variant={isPlaying ? 'mint' : 'sand'}
-            aria-pressed={isPlaying}
-            onClick={togglePlay}
-            aria-label={isPlaying ? 'Jeda video' : 'Putar video'}
-          >
-            {isPlaying ? 'Jeda' : 'Putar'}
-          </Button>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label htmlFor="trim-start" style={{ fontSize: '13px', fontWeight: 800 }}>
-              Mulai
-            </label>
-            <span style={{ fontSize: '12px', fontWeight: 800 }}>{formatTime(trim.start)} ({trim.start.toFixed(1)}s)</span>
-          </div>
-          <input
-            id="trim-start"
-            type="range"
-            min="0"
-            max={Math.max(0, media.duration - 0.2)}
-            step="0.1"
-            value={trim.start}
-            onChange={(e) => handleStartChange(Number(e.target.value))}
-            className="range-slider"
-            aria-label="Titik mulai klip"
-          />
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label htmlFor="trim-end" style={{ fontSize: '13px', fontWeight: 800 }}>
-              Akhir
-            </label>
-            <span style={{ fontSize: '12px', fontWeight: 800 }}>{formatTime(trim.end)} ({trim.end.toFixed(1)}s)</span>
-          </div>
-          <input
-            id="trim-end"
-            type="range"
-            min="0.2"
-            max={media.duration}
-            step="0.1"
-            value={trim.end}
-            onChange={(e) => handleEndChange(Number(e.target.value))}
-            className="range-slider"
-            aria-label="Titik akhir klip"
-          />
-        </div>
-      </div>
 
       {/* Done Button */}
       <Button
@@ -476,7 +328,7 @@ export function VideoKeyEditor({
         size="lg"
         onClick={onClose}
         style={{ width: '100%' }}
-        aria-label="Selesai mengedit video"
+        aria-label="Selesai mengedit latar template"
       >
         Selesai
       </Button>

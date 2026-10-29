@@ -4,7 +4,7 @@ import {
   useEffect,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import type { PhotoMedia } from '../types/media';
+import type { TemplateImage } from '../types/media';
 import type { CutoutMask, MaskPoint } from '../types/editor';
 import {
   createMask,
@@ -17,7 +17,7 @@ import {
 import { Button } from './Button';
 
 export interface PhotoCutoutEditorProps {
-  media: PhotoMedia;
+  template: TemplateImage;
   mask: CutoutMask | null;
   onChange: (next: CutoutMask) => void;
   onClose: () => void;
@@ -27,7 +27,7 @@ export interface PhotoCutoutEditorProps {
 type CutoutMode = 'wand' | 'erase' | 'restore';
 
 export function PhotoCutoutEditor({
-  media,
+  template,
   mask,
   onChange,
   onClose,
@@ -37,9 +37,9 @@ export function PhotoCutoutEditor({
   const [tolerance, setTolerance] = useState<number>(0.25);
   const [brushSize, setBrushSize] = useState<number>(28);
 
-  const workScale = Math.min(1, 2048 / Math.max(media.width, media.height));
-  const workW = Math.max(1, Math.round(media.width * workScale));
-  const workH = Math.max(1, Math.round(media.height * workScale));
+  const workScale = Math.min(1, 2048 / Math.max(template.width, template.height));
+  const workW = Math.max(1, Math.round(template.width * workScale));
+  const workH = Math.max(1, Math.round(template.height * workScale));
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pixelsRef = useRef<Uint8ClampedArray | null>(null);
@@ -60,19 +60,19 @@ export function PhotoCutoutEditor({
     }
   }, [mask, workW, workH, onChange]);
 
-  // Cache source pixels from media.source at working resolution
+  // Cache source pixels from template.source at working resolution
   useEffect(() => {
     const helper = document.createElement('canvas');
     helper.width = workW;
     helper.height = workH;
     const ctx = helper.getContext('2d', { willReadFrequently: true });
     if (ctx) {
-      ctx.drawImage(media.source, 0, 0, workW, workH);
+      ctx.drawImage(template.source, 0, 0, workW, workH);
       pixelsRef.current = ctx.getImageData(0, 0, workW, workH).data;
     }
-  }, [media, workW, workH]);
+  }, [template, workW, workH]);
 
-  // Redraw preview canvas whenever mask or media updates
+  // Redraw preview canvas whenever mask or template updates
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -90,7 +90,7 @@ export function PhotoCutoutEditor({
       helper.height = workH;
       const hctx = helper.getContext('2d', { willReadFrequently: true });
       if (hctx) {
-        hctx.drawImage(media.source, 0, 0, workW, workH);
+        hctx.drawImage(template.source, 0, 0, workW, workH);
         pixelsRef.current = hctx.getImageData(0, 0, workW, workH).data;
       }
     }
@@ -99,7 +99,7 @@ export function PhotoCutoutEditor({
     if (!pixels) return;
 
     if (!mask) {
-      ctx.drawImage(media.source, 0, 0, workW, workH);
+      ctx.drawImage(template.source, 0, 0, workW, workH);
       return;
     }
 
@@ -117,9 +117,9 @@ export function PhotoCutoutEditor({
     }
 
     ctx.putImageData(imgData, 0, 0);
-  }, [media, mask, workW, workH]);
+  }, [template, mask, workW, workH]);
 
-  const getMediaPoint = (e: ReactPointerEvent<HTMLCanvasElement>): { pt: MaskPoint; rectWidth: number } | null => {
+  const getTemplatePoint = (e: ReactPointerEvent<HTMLCanvasElement>): { pt: MaskPoint; rectWidth: number } | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
@@ -136,7 +136,7 @@ export function PhotoCutoutEditor({
   };
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
-    const info = getMediaPoint(e);
+    const info = getTemplatePoint(e);
     if (!info) return;
     const { pt, rectWidth } = info;
 
@@ -169,7 +169,7 @@ export function PhotoCutoutEditor({
 
   const handlePointerMove = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     if (!isDraggingRef.current || mode === 'wand') return;
-    const info = getMediaPoint(e);
+    const info = getTemplatePoint(e);
     const lastPt = lastPointRef.current;
     if (!info || !lastPt) return;
     const { pt, rectWidth } = info;
@@ -231,7 +231,7 @@ export function PhotoCutoutEditor({
     >
       {/* Header with Title and Coverage Badge */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ fontSize: '15px', fontWeight: 900 }}>Hapus Latar Foto</h3>
+        <h3 style={{ fontSize: '15px', fontWeight: 900 }}>Hapus Latar Template</h3>
         <span
           style={{
             fontSize: '13px',
@@ -243,7 +243,7 @@ export function PhotoCutoutEditor({
             boxShadow: '2px 2px 0 var(--ink)',
           }}
         >
-          Sisa foto: {coveragePercent}%
+          Sisa template: {coveragePercent}%
         </span>
       </div>
 
@@ -264,7 +264,7 @@ export function PhotoCutoutEditor({
         <canvas
           ref={canvasRef}
           role="img"
-          aria-label="Pratinjau penghapusan latar foto"
+          aria-label="Pratinjau penghapusan latar template"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -273,7 +273,7 @@ export function PhotoCutoutEditor({
             width: '100%',
             height: 'auto',
             display: 'block',
-            aspectRatio: `${media.width} / ${media.height}`,
+            aspectRatio: `${template.width} / ${template.height}`,
           }}
         />
       </div>
@@ -399,7 +399,7 @@ export function PhotoCutoutEditor({
           variant="sand"
           size="md"
           onClick={handleReset}
-          aria-label="Atur ulang mask foto"
+          aria-label="Atur ulang mask template"
         >
           Reset
         </Button>
@@ -408,7 +408,7 @@ export function PhotoCutoutEditor({
           variant="primary"
           size="md"
           onClick={onClose}
-          aria-label="Selesai mengedit latar foto"
+          aria-label="Selesai mengedit latar template"
         >
           Selesai
         </Button>

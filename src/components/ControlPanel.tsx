@@ -1,4 +1,5 @@
 import { type ChangeEvent } from 'react';
+import type { VideoTrim } from '../types/editor';
 import { Button } from './Button';
 
 export interface ControlPanelProps {
@@ -9,16 +10,19 @@ export interface ControlPanelProps {
   flipX: boolean;
   templateKind?: 'image' | 'video';
   mediaKind?: 'photo' | 'video';
+  templateNeedsHole?: boolean;
   isExporting: boolean;
   isUncovered?: boolean;
   showVideoDownload?: boolean;
+  mediaDuration?: number;
+  trim?: VideoTrim;
   onZoom: (newScale: number) => void;
   onFit?: () => void;
   onRotate: (deltaRadians: number) => void;
   onFlip: () => void;
   onReset: () => void;
-  onOpenCutout?: () => void;
-  onOpenChroma?: () => void;
+  onOpenTemplateBackground?: () => void;
+  onChangeTrim?: (next: VideoTrim) => void;
   onDownloadStill: () => void;
   onDownloadMotion?: () => void;
   onChangeMedia?: () => void;
@@ -34,16 +38,19 @@ export function ControlPanel({
   flipX,
   templateKind,
   mediaKind = 'photo',
+  templateNeedsHole = false,
   isExporting,
   isUncovered = false,
   showVideoDownload,
+  mediaDuration,
+  trim,
   onZoom,
   onFit,
   onRotate,
   onFlip,
   onReset,
-  onOpenCutout,
-  onOpenChroma,
+  onOpenTemplateBackground,
+  onChangeTrim,
   onDownloadStill,
   onDownloadMotion,
   onChangeMedia,
@@ -231,33 +238,136 @@ export function ControlPanel({
           Atur ulang
         </Button>
       </div>
-      {/* Media-specific cutout or chroma panel trigger */}
-      {mediaKind === 'photo' && onOpenCutout && (
-        <Button
-          type="button"
-          variant="accent"
-          size="md"
-          onClick={onOpenCutout}
-          disabled={isExporting}
-          style={{ width: '100%' }}
-          aria-label="Buka alat hapus latar foto"
-        >
-          Hapus latar foto
-        </Button>
+      {/* Template background trigger */}
+      {onOpenTemplateBackground && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <Button
+            type="button"
+            variant="accent"
+            size="md"
+            onClick={onOpenTemplateBackground}
+            disabled={isExporting}
+            style={{ width: '100%' }}
+            aria-label="Hapus latar template"
+          >
+            Hapus latar template
+          </Button>
+          {templateNeedsHole && (
+            <div
+              style={{
+                padding: '8px 12px',
+                backgroundColor: 'var(--sand)',
+                border: '2px solid var(--ink)',
+                borderRadius: 'var(--radius)',
+                boxShadow: '2px 2px 0 var(--ink)',
+                fontSize: '13px',
+                fontWeight: 800,
+                color: 'var(--ink)',
+              }}
+            >
+              Template belum punya lubang. Hapus latar dulu supaya foto kamu kelihatan.
+            </div>
+          )}
+        </div>
       )}
 
-      {mediaKind === 'video' && onOpenChroma && (
-        <Button
-          type="button"
-          variant="accent"
-          size="md"
-          onClick={onOpenChroma}
-          disabled={isExporting}
-          style={{ width: '100%' }}
-          aria-label="Buka pengaturan latar dan klip video"
+      {/* Clip trim (shown only for user video when trim, onChangeTrim, and mediaDuration exist) */}
+      {mediaKind === 'video' && trim && onChangeTrim && typeof mediaDuration === 'number' && (
+        <div
+          style={{
+            border: '3px solid var(--ink)',
+            borderRadius: 'var(--radius)',
+            boxShadow: '4px 4px 0 var(--ink)',
+            backgroundColor: '#FFFFFF',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
         >
-          Hapus latar & klip video
-        </Button>
+          <span
+            style={{
+              fontSize: '14px',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.02em',
+            }}
+          >
+            POTONG KLIP
+          </span>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="trim-start" style={{ fontSize: '13px', fontWeight: 800 }}>
+                Mulai
+              </label>
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  backgroundColor: 'var(--sand)',
+                  padding: '1px 6px',
+                  border: '1px solid var(--ink)',
+                  borderRadius: '2px',
+                }}
+              >
+                {trim.start.toFixed(1)}s
+              </span>
+            </div>
+            <input
+              id="trim-start"
+              type="range"
+              min="0"
+              max={Math.max(0, mediaDuration - 0.2)}
+              step="0.1"
+              value={trim.start}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                const safeVal = Math.max(0, Math.min(val, trim.end - 0.2));
+                const rounded = Math.round(safeVal * 10) / 10;
+                onChangeTrim({ start: rounded, end: trim.end });
+              }}
+              className="range-slider"
+              aria-label="Titik mulai klip"
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="trim-end" style={{ fontSize: '13px', fontWeight: 800 }}>
+                Akhir
+              </label>
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  backgroundColor: 'var(--sand)',
+                  padding: '1px 6px',
+                  border: '1px solid var(--ink)',
+                  borderRadius: '2px',
+                }}
+              >
+                {trim.end.toFixed(1)}s
+              </span>
+            </div>
+            <input
+              id="trim-end"
+              type="range"
+              min="0.2"
+              max={mediaDuration}
+              step="0.1"
+              value={trim.end}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                const safeVal = Math.min(mediaDuration, Math.max(val, trim.start + 0.2));
+                const rounded = Math.round(safeVal * 10) / 10;
+                onChangeTrim({ start: trim.start, end: rounded });
+              }}
+              className="range-slider"
+              aria-label="Titik akhir klip"
+            />
+          </div>
+        </div>
       )}
 
       {/* Main Download actions */}

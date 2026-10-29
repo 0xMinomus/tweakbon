@@ -1,5 +1,14 @@
 const linkClass = 'site-footer-link';
 
+const REPO_URL = 'https://github.com/0xMinomus/tweakbon';
+
+const projectLinks = [
+  { label: 'Dokumentasi', href: `${REPO_URL}#readme` },
+  { label: 'Privasi', href: `${REPO_URL}/blob/master/docs/privacy.md` },
+  { label: 'Laporkan masalah', href: `${REPO_URL}/issues/new/choose` },
+  { label: 'GitHub', href: REPO_URL },
+];
+
 export function SiteFooter() {
   return (
     <footer className="site-footer anim-reveal">
@@ -13,35 +22,21 @@ export function SiteFooter() {
           <h2 className="site-footer-heading">Situs</h2>
           <a href="#top" className={linkClass}>Beranda</a>
           <a href="#alur" className={linkClass}>Cara pakai</a>
-          <a href="#privasi" className={linkClass}>Privasi</a>
         </nav>
 
         <nav aria-label="Tautan proyek" className="site-footer-col">
           <h2 className="site-footer-heading">Proyek</h2>
-          <a
-            href="https://github.com/tweakbon/tweakbon"
-            target="_blank"
-            rel="noreferrer noopener"
-            className={linkClass}
-          >
-            Dokumentasi
-          </a>
-          <a
-            href="https://github.com/tweakbon/tweakbon/issues"
-            target="_blank"
-            rel="noreferrer noopener"
-            className={linkClass}
-          >
-            Laporkan masalah
-          </a>
-          <a
-            href="https://github.com/tweakbon/tweakbon"
-            target="_blank"
-            rel="noreferrer noopener"
-            className={linkClass}
-          >
-            GitHub
-          </a>
+          {projectLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              target="_blank"
+              rel="noreferrer noopener"
+              className={linkClass}
+            >
+              {link.label}
+            </a>
+          ))}
         </nav>
       </div>
 

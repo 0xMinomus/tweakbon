@@ -319,6 +319,54 @@ html.cursor-plane-active *::-moz-range-track {
   background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
 }
 
+/* ---------- Hero banner ---------- */
+.hero-banner {
+  overflow: hidden;
+  padding: 9px 0;
+  border: var(--border-width) solid var(--ink);
+  border-radius: var(--radius);
+  background-color: var(--sun);
+  box-shadow: var(--shadow-hard);
+}
+
+.hero-banner-track {
+  display: flex;
+  width: max-content;
+  animation: bannerScroll 26s linear infinite;
+}
+
+.hero-banner:hover .hero-banner-track {
+  animation-play-state: paused;
+}
+
+.hero-banner-item {
+  padding-right: 30px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hero-banner-item::after {
+  content: "✦";
+  margin-left: 30px;
+  font-size: 11px;
+}
+
+/* The track holds the label list twice; half its width is one full loop. */
+@keyframes bannerScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-banner-track {
+    animation: none;
+    transform: none;
+  }
+}
+
 /* ---------- Reveal on mount ---------- */
 @keyframes revealUp {
   from { opacity: 0; transform: translateY(14px); }

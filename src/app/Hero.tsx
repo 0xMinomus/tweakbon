@@ -110,6 +110,38 @@ function TemplateThumbnail({ manifest }: { manifest: TemplateManifest }) {
   );
 }
 
+const BANNER_LABELS = [
+  '100% di peramban',
+  'Foto tidak diunggah',
+  'Tanpa database',
+  'Tanpa akun',
+  'Gratis',
+] as const;
+
+/**
+ * Marquee strip above the title. The track is decorative repetition, so it is
+ * hidden from assistive tech; the wrapper carries the whole sentence once.
+ */
+function HeroBanner() {
+  const marquee = [...BANNER_LABELS, ...BANNER_LABELS];
+
+  return (
+    <div
+      className="hero-banner"
+      role="note"
+      aria-label="100% di peramban. Foto tidak diunggah ke server mana pun. Tanpa database, tanpa akun, gratis."
+    >
+      <div className="hero-banner-track" aria-hidden="true">
+        {marquee.map((label, index) => (
+          <span key={`${index}-${label}`} className="hero-banner-item">
+            {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Hero({
   manifest,
   media,
@@ -173,6 +205,8 @@ export function Hero({
   return (
     <div id="top" className="container" style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
       {/* Title & Subtitle */}
+      <HeroBanner />
+
       <header className="anim-hero-title" style={{ textAlign: 'center' }}>
         <div
           style={{

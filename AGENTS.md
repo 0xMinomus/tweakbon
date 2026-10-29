@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-Tweakbon is a browser tool that puts a person's photo or video into a Twibbon template. The user supplies a template with a transparent region (the "slot"), supplies their own media, then pans, zooms, and rotates that media until it sits correctly inside the slot. Image and video templates follow the same flow.
+Tweakbon is a browser tool that puts a person's photo or video into a Twibbon template. The user supplies a template (photo or video) with a transparent region (the "slot"), supplies their own media, then pans, zooms, and rotates that media until it sits correctly inside the slot. A template may also arrive fully opaque: the user carves the slot out of the template itself, with chroma key for a video template and background removal for a photo template. Image and video templates follow the same flow.
 
 > **Status: working.** The hero-to-editor-to-download flow is implemented and verified in Chromium: photo and video media, PNG and MP4 export, three shipped templates, and a custom PNG template path. No backend. Tests, lint, typecheck and build are green.
 
@@ -8,7 +8,7 @@ Tweakbon is a browser tool that puts a person's photo or video into a Twibbon te
 
 - One job: composite user media into a transparent slot of a template, then export.
 - Audience is non-technical. The editor must open, auto-fit, and be adjustable in one gesture each.
-- Templates come from the user. The slot is found by scanning the alpha channel of the uploaded file.
+- Templates come from the user. The slot is found by scanning the alpha channel of the uploaded file; an opaque template gets the full frame as its slot.
 - Scope discipline: the editor, the compositor, and export. No accounts, no social features, no server-rendered preview.
 
 ## Architecture & Data Flow
@@ -37,7 +37,7 @@ canvas
  └─ draw template on top (its transparent area reveals the media)
 ```
 
-The template is the top layer. That is why the slot must be transparent: the alpha channel is the composition mask. Never punch a hole with `globalCompositeOperation` when the template already carries alpha; likewise never draw the media over the template.
+The template is the top layer. That is why the slot must be transparent: the alpha channel is the composition mask. When the uploaded template carries no alpha of its own, the hole is created on the template at runtime — chroma key for a video template, a cutout mask for a photo template — and the user's media is never keyed or masked. Never punch a hole with `globalCompositeOperation` when the template already carries alpha; likewise never draw the media over the template.
 
 ### Data flow
 
@@ -47,7 +47,7 @@ template file ──► manifest (slot geometry, natural size, kind) ──┐
 user media ──► decode to ImageBitmap | HTMLVideoElement ──────────┘                          └──► export encoder
 ```
 
-1. Template load: read manifest, decode template frame. If a manifest is absent, fall back to alpha-bounding-box detection for images only. Video templates require a manifest.
+1. Template load: decode the template frame and detect the slot from its alpha. A template with no transparent region is valid, not an error: it receives the full-frame slot and the user carves the hole with the template's own chroma key or cutout mask. Video templates do not require a manifest.
 2. Media load: `createImageBitmap` for photos, a muted looping `<video>` for user videos. Keep both out of React state.
 3. Auto-fit: scale media to cover the slot, center it, clamp rotation to 0.
 4. Interaction: drag to translate, pinch/wheel to scale, optional rotate. Clamp so the slot never shows background.
@@ -120,7 +120,9 @@ npm run test:watch   # Vitest, watch
 | `src/features/template/manifest.ts` | manifest parse/validate, index loader |
 | `src/features/template/slot-detect.ts` | alpha bounding-box detection for custom templates |
 | `src/features/media/load.ts` | image/video decode, template fetch, idempotent `release()` |
-| `src/features/render/compositor.ts` | draw order, slot clipping, transform application |
+| `src/features/render/compositor.ts` | draw order, slot clipping, transform application, template keying/cutout |
+| `src/features/render/keying.ts` | chroma-key a video template frame onto the canvas |
+| `src/features/render/masking.ts` | `bakeMaskedTemplate`: apply the template's cutout mask with `destination-in` |
 | `src/features/export/export.ts` | offscreen still render, MediaRecorder motion export |
 | `src/components/CanvasStage.tsx` | DPR canvas, pointer/pinch/keyboard input, rAF loop |
 | `src/types/template.ts` | `TemplateManifest`, `SlotRect`, `Point` |

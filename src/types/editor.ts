@@ -36,8 +36,9 @@ export interface Rgb {
 }
 
 /**
- * Chroma key settings. Applied only to video media; a photo never carries one.
- * All three amounts are 0..1 so the UI can bind them to plain sliders.
+ * Chroma key settings. Applied to a video **template** to carve the slot out of
+ * an opaque clip; the user's own media is never keyed. All three amounts are
+ * 0..1 so the UI can bind them to plain sliders.
  */
 export interface ChromaKeySettings {
   /** false draws the video untouched. */
@@ -59,9 +60,9 @@ export interface VideoTrim {
 }
 
 /**
- * Photo background removal mask. Big and non-serializable: it lives in a ref,
- * never in React state. `alpha` is one byte per source pixel, row-major,
- * `width * height` long; 0 = removed, 255 = kept.
+ * Background-removal mask for a **photo template**. Big and non-serializable:
+ * it lives in a ref, never in React state. `alpha` is one byte per source pixel,
+ * row-major, `width * height` long; 0 = removed, 255 = kept.
  */
 export interface CutoutMask {
   width: number;

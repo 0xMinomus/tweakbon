@@ -4,12 +4,12 @@ import type { SlotRect } from './template';
  * Media contract. Owned by the orchestrator.
  *
  * Two inputs, deliberately asymmetric:
- *  - the template (left pane) is a still image OR a video, and carries the
- *    transparent slot the user's media shows through;
- *  - the user media (right pane) is a still photo OR a video without alpha.
- *
- * A video user medium is opaque: its background is removed with chroma key,
- * never by relying on the encoded alpha channel.
+ *  - the template (left pane) is a still image OR a video and is the top layer.
+ *    It may arrive with its own alpha hole, or fully opaque; when opaque the
+ *    user carves the hole out of the template itself with chroma key (video
+ *    template) or background removal (photo template).
+ *  - the user media (right pane) is a still photo OR a video without alpha and
+ *    is never keyed or masked; it is simply drawn behind the template.
  *
  * Media objects are large and non-serializable. They never enter React state;
  * they live in refs or an owner object. Every source carries its own release().

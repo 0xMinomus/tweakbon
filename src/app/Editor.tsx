@@ -19,18 +19,24 @@ export function Editor({ session, onBack }: EditorProps) {
     template,
     manifest,
     transform,
+    templateChroma,
+    templateMask,
+    templateNeedsHole,
+    trim,
     isLoading,
     error,
     minScale,
     maxScale,
     setMedia,
     setCustomTemplate,
+    setTemplateChroma,
+    setTemplateMask,
+    setTrim,
     dispatchTransform,
   } = session;
-
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [openPanel, setOpenPanel] = useState<'none' | 'cutout' | 'chroma'>('none');
+  const [openPanel, setOpenPanel] = useState<'none' | 'template'>('none');
 
   const templateInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -74,11 +80,13 @@ export function Editor({ session, onBack }: EditorProps) {
       manifest,
       transform,
     };
-    if (media.kind === 'photo') {
-      base.mask = session.mask;
-    } else {
-      base.chroma = session.chroma;
-      base.trim = session.trim;
+    if (template.kind === 'image') {
+      base.templateMask = templateMask;
+    } else if (template.kind === 'video') {
+      base.templateChroma = templateChroma;
+    }
+    if (media.kind === 'video') {
+      base.trim = trim;
     }
     return base;
   };
@@ -115,7 +123,7 @@ export function Editor({ session, onBack }: EditorProps) {
 
     try {
       const durationSeconds = media.kind === 'video'
-        ? Math.min(30, Math.max(1, session.trim.end - session.trim.start))
+        ? Math.min(30, Math.max(1, trim.end - trim.start))
         : 15;
       const blob = await exportMotion(input, durationSeconds);
 
@@ -217,9 +225,9 @@ export function Editor({ session, onBack }: EditorProps) {
               media={media}
               manifest={manifest}
               transform={transform}
-              mask={session.mask}
-              chroma={session.chroma}
-              trim={session.trim}
+              templateMask={templateMask}
+              templateChroma={templateChroma}
+              trim={trim}
               onAction={dispatchTransform}
             />
           ) : (
@@ -253,40 +261,44 @@ export function Editor({ session, onBack }: EditorProps) {
             flipX={transform.flipX}
             templateKind={manifest?.kind}
             mediaKind={media?.kind}
+            templateNeedsHole={
+              templateNeedsHole &&
+              (template?.kind === 'image' ? templateMask === null : !templateChroma.enabled)
+            }
             showVideoDownload={Boolean(manifest?.kind === 'video' || media?.kind === 'video')}
             isExporting={isExporting}
+            isUncovered={uncovered}
+            mediaDuration={media?.kind === 'video' ? media.duration : undefined}
+            trim={trim}
             onZoom={(newScale) => dispatchTransform({ type: 'scale', scale: newScale })}
             onFit={() => dispatchTransform({ type: 'scale', scale: 1 })}
-            isUncovered={uncovered}
             onRotate={(deltaRadians) => dispatchTransform({ type: 'rotate', deltaRadians })}
             onFlip={() => dispatchTransform({ type: 'flip' })}
             onReset={() => dispatchTransform({ type: 'reset' })}
-            onOpenCutout={() => setOpenPanel((prev) => (prev === 'cutout' ? 'none' : 'cutout'))}
-            onOpenChroma={() => setOpenPanel((prev) => (prev === 'chroma' ? 'none' : 'chroma'))}
+            onOpenTemplateBackground={() => setOpenPanel((prev) => (prev === 'template' ? 'none' : 'template'))}
+            onChangeTrim={setTrim}
             onDownloadStill={handleDownloadStill}
             onDownloadMotion={handleDownloadMotion}
             onChangePhoto={handleChangePhotoClick}
           />
 
-          {openPanel === 'cutout' && media?.kind === 'photo' && (
+          {openPanel === 'template' && template?.kind === 'image' && (
             <div style={{ marginTop: '20px' }}>
               <PhotoCutoutEditor
-                media={media}
-                mask={session.mask}
-                onChange={session.setMask}
+                template={template}
+                mask={templateMask}
+                onChange={setTemplateMask}
                 onClose={() => setOpenPanel('none')}
               />
             </div>
           )}
 
-          {openPanel === 'chroma' && media?.kind === 'video' && (
+          {openPanel === 'template' && template?.kind === 'video' && (
             <div style={{ marginTop: '20px' }}>
               <VideoKeyEditor
-                media={media}
-                chroma={session.chroma}
-                trim={session.trim}
-                onChangeChroma={session.setChroma}
-                onChangeTrim={session.setTrim}
+                template={template}
+                chroma={templateChroma}
+                onChangeChroma={setTemplateChroma}
                 onClose={() => setOpenPanel('none')}
               />
             </div>

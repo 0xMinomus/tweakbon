@@ -156,7 +156,7 @@ export function Hero({
     const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|avif|gif)$/i.test(file.name);
     const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|m4v)$/i.test(file.name);
     if (!isImage && !isVideo) {
-      return 'Gunakan file PNG transparan atau video untuk template.';
+      return 'Gunakan file foto atau video untuk template.';
     }
     return null;
   };
@@ -236,7 +236,7 @@ export function Hero({
           {/* Left Pane: Template */}
           <DropPane
             title="1. Template Twibbon"
-            subtitle="Tarik file PNG transparan atau video ke sini, atau klik untuk memilih file."
+            subtitle="Tarik file foto atau video template ke sini. Jika belum ada lubang transparan, latar bisa dihapus di editor."
             accept="image/png,image/*,video/*"
             filled={Boolean(manifest)}
             previewNode={manifest ? <TemplateThumbnail manifest={manifest} /> : undefined}
@@ -329,7 +329,7 @@ export function Hero({
             </span>
             <h3 style={{ fontSize: '18px', margin: '12px 0 6px' }}>PILIH TEMPLATE</h3>
             <p style={{ fontSize: '14px', fontWeight: 600, opacity: 0.85, lineHeight: 1.5 }}>
-              Unggah file PNG transparan atau video milikmu sendiri untuk template twibbon.
+              Unggah foto atau video template. Bisa yang sudah transparan atau hapus latarnya di editor.
             </p>
           </div>
 

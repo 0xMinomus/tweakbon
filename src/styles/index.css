@@ -278,9 +278,27 @@ h1, h2, h3, h4, h5, h6 {
   50% { transform: rotate(4deg) translateY(-6px) translateX(3px); }
 }
 
-/* The native cursor is hidden only where the plane is actually drawn. */
+/* The native cursor is hidden only where the plane is actually drawn.
+   Pseudo-elements are not matched by `*`, so slider thumbs/tracks and scrollbars
+   need their own rule. Vendor pseudo-elements are unknown to the other engine, and
+   one unknown selector invalidates a whole comma list, so each engine gets its own
+   rule. */
 html.cursor-plane-active,
-html.cursor-plane-active * {
+html.cursor-plane-active *,
+html.cursor-plane-active *::before,
+html.cursor-plane-active *::after {
+  cursor: none !important;
+}
+
+html.cursor-plane-active *::-webkit-slider-thumb,
+html.cursor-plane-active *::-webkit-slider-runnable-track,
+html.cursor-plane-active *::-webkit-scrollbar,
+html.cursor-plane-active *::-webkit-scrollbar-thumb {
+  cursor: none !important;
+}
+
+html.cursor-plane-active *::-moz-range-thumb,
+html.cursor-plane-active *::-moz-range-track {
   cursor: none !important;
 }
 

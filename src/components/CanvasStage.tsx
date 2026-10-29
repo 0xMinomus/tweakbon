@@ -18,8 +18,8 @@ export interface CanvasStageProps {
   media: UserMedia;
   manifest: TemplateManifest;
   transform: TransformState;
-  mask?: CutoutMask | null;
-  chroma?: ChromaKeySettings;
+  templateMask?: CutoutMask | null;
+  templateChroma?: ChromaKeySettings;
   trim?: VideoTrim;
   onAction: (action: TransformAction) => void;
   className?: string;
@@ -30,8 +30,8 @@ export function CanvasStage({
   media,
   manifest,
   transform,
-  mask,
-  chroma,
+  templateMask,
+  templateChroma,
   trim,
   onAction,
   className = '',
@@ -114,8 +114,8 @@ export function CanvasStage({
             media,
             manifest,
             transform,
-            mask,
-            chroma,
+            templateMask,
+            templateChroma,
             trim,
           },
           targetW,
@@ -146,7 +146,7 @@ export function CanvasStage({
         cancelAnimationFrame(animId);
       }
     };
-  }, [template, media, manifest, transform, mask, chroma, trim]);
+  }, [template, media, manifest, transform, templateMask, templateChroma, trim]);
   // Pointer event handlers
   const handlePointerDown = (e: ReactPointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);

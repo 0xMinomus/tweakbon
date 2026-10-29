@@ -45,7 +45,6 @@ export function PlaneCursor() {
       shown = false;
       plane.classList.remove('cursor-plane-visible');
       plane.classList.remove('cursor-plane-grabbing');
-      root.classList.remove('cursor-plane-active');
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
         rafId = null;
@@ -104,6 +103,11 @@ export function PlaneCursor() {
     };
 
     const onPointerDown = (event: PointerEvent) => {
+      posX = event.clientX;
+      posY = event.clientY;
+      plane.classList.remove('cursor-plane-idle');
+      applyTransform();
+      show();
       const target = event.target as Element | null;
       if (target?.closest('canvas, .canvas-stage-wrapper')) {
         plane.classList.add('cursor-plane-grabbing');

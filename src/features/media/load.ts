@@ -154,7 +154,8 @@ export async function loadTemplateImage(src: string): Promise<TemplateImage> {
 export interface CustomTemplate {
   manifest: TemplateManifest;
   template: TemplateSource;
-  image?: TemplateSource;
+  /** True when the file carried no alpha hole; the user must key or erase one. */
+  needsHole: boolean;
   release: () => void;
 }
 
@@ -290,18 +291,23 @@ export async function loadCustomTemplateFile(file: File): Promise<CustomTemplate
         height,
         data: imageData.data,
       });
-
-      if (!slot) {
-        throw new Error('Video template tidak memiliki area transparan pada frame awal.');
-      }
+      const needsHole = slot === null;
 
       const manifest: TemplateManifest = {
-        ...buildTemplateManifest({
-          kind: 'video',
-          width,
-          height,
-          slot,
-        }),
+        ...buildTemplateManifest(
+          slot
+            ? {
+                kind: 'video',
+                width,
+                height,
+                slot,
+              }
+            : {
+                kind: 'video',
+                width,
+                height,
+              },
+        ),
         src: objectUrl,
       };
 
@@ -323,7 +329,7 @@ export async function loadCustomTemplateFile(file: File): Promise<CustomTemplate
       return {
         manifest,
         template,
-        image: template,
+        needsHole,
         release,
       };
     } catch (err) {
@@ -372,12 +378,7 @@ export async function loadCustomTemplateFile(file: File): Promise<CustomTemplate
       height,
       data: imageData.data,
     });
-
-    if (!slot) {
-      bitmap.close();
-      URL.revokeObjectURL(objectUrl);
-      throw new Error('Tidak ditemukan area transparan pada template. Harap gunakan file gambar dengan latar belakang transparan.');
-    }
+    const needsHole = slot === null;
 
     let released = false;
     const release = () => {
@@ -388,12 +389,20 @@ export async function loadCustomTemplateFile(file: File): Promise<CustomTemplate
     };
 
     const manifest: TemplateManifest = {
-      ...buildTemplateManifest({
-        kind: 'image',
-        width,
-        height,
-        slot,
-      }),
+      ...buildTemplateManifest(
+        slot
+          ? {
+              kind: 'image',
+              width,
+              height,
+              slot,
+            }
+          : {
+              kind: 'image',
+              width,
+              height,
+            },
+      ),
       src: objectUrl,
     };
 
@@ -408,7 +417,7 @@ export async function loadCustomTemplateFile(file: File): Promise<CustomTemplate
     return {
       manifest,
       template,
-      image: template,
+      needsHole,
       release,
     };
   }

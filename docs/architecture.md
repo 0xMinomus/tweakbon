@@ -15,7 +15,7 @@ The system is organized into three distinct layers:
 2. **Rendering (Canvas 2D Engine)**
    - Located in `src/features/render/` and `src/features/export/`.
    - Translates domain state into pixels using HTML5 Canvas 2D and OffscreenCanvas APIs.
-   - Enforces layer ordering: user photo on bottom, template graphic or video on top.
+   - Enforces layer ordering: user media on bottom, template graphic or video on top.
    - Decoupled from React lifecycle via explicit render calls and frame input structures.
 
 3. **User Interface (React)**
@@ -56,15 +56,15 @@ In Tweakbon, the template is always the top layer:
 
 ```
 Canvas Output
- ├─ Layer 1 (Bottom): User photo, transformed into slot space and clipped to slot bounds
- └─ Layer 2 (Top): Template graphic or video, covering the canvas; its transparent cutout reveals the photo
+ ├─ Layer 1 (Bottom): User media (photo or video), transformed into slot space and clipped to slot bounds
+ └─ Layer 2 (Top): Template graphic or video, covering the canvas; its transparent cutout reveals the media
 ```
 
 ### Rationale
 
-The transparent hole in the template asset acts as the natural compositing mask.
+The transparent hole in the template asset acts as the natural compositing mask. If a template arrives without an alpha hole, the hole is created directly on the template: via background removal (cutout mask) for photo templates or chroma keying for video templates. User media is drawn plainly behind the template.
 - Never punch holes using canvas `globalCompositeOperation = 'destination-out'` when the template graphic already contains an alpha channel.
-- Never draw user photo media on top of the template frame, which would obscure borders, overlays, and decorative elements.
+- Never draw user media on top of the template frame, which would obscure borders, overlays, and decorative elements.
 
 ### Draw Order Inside `drawFrame`
 
@@ -102,7 +102,7 @@ flowchart LR
 2. **Decode**: Photo decodes via `createImageBitmap` respecting EXIF orientation. Image templates decode to `ImageBitmap`; video templates mount to a muted looping `<video>`.
 3. **Template Slot Detection**: The slot is detected from alpha channel data. For video templates, frame 0 is decoded and analyzed once at load time, and the resulting slot coordinates are held constant for the entire clip.
 4. **Video Template Mask Constraint**: Because the slot is sampled once at frame 0, the transparent region in a video template must remain stationary relative to the frame. If the hole moves in the video, the cutout mask drifts away from the stationary photo underneath.
-5. **Video Template Codec**: the source must carry per-pixel alpha. WebM/VP9 does; H.264/MP4 does not, so a transparent MP4 decodes as fully opaque and is rejected.
+5. **Video Template Codec**: The template no longer has to carry per-pixel alpha. WebM/VP9 with alpha is supported directly, and opaque MP4/WebM videos are now valid: they load with a full-frame slot and are keyed at runtime via chroma key to carve the slot.
 6. **Auto-fit**: Initial scale and position are computed to cover the slot while centering the photo.
 7. **Interactive Adjustment**: Pointer drag, scroll wheel, pinch, and keyboard events trigger pure transform reducers, clamped against the rotated bounding box.
 8. **Compositing**: Redraws run on `requestAnimationFrame`, filling `#FFF8EC` under uncovered photo regions and drawing the template frame on top.
@@ -115,27 +115,27 @@ The editor provides distinct controls for template and photo management:
 - **Header Template Switcher**: The editor header includes a dedicated template replacement button. Users can pick a new PNG or video template directly without returning to the landing view or losing current session context.
 - **Control Panel Photo Replacement**: Photo replacement remains available within the editor control panel, alongside zoom, rotation, horizontal flip, and reset adjustments. The former generic media switcher in the header has been replaced by the template changer.
 
-## Video Media & Chroma Key
+## Video Template & Chroma Key
 
-Video media loaded via `loadVideoFile` is decoded into a looping `<video>` element and composited through `drawKeyedVideoFrame`:
+When a video template is opaque or requires background removal, chroma keying is applied to the **template** via `drawKeyedVideoFrame` to carve the slot:
 
-- **Processing Flow**: `loadVideoFile` mounts local user video, and `drawKeyedVideoFrame` processes video frames onto an intermediate work canvas capped at 1280 px before compositing into the slot.
+- **Processing Flow**: Video templates are decoded into a looping `<video>` element. When chroma key is enabled, `drawKeyedVideoFrame` processes template frames onto an intermediate work canvas capped at 1280 px (or display cap) before compositing on top of the user media.
 - **LUT Acceleration**: Keying uses a precomputed 32³ (32,768 entries) RGB lookup table built by `buildChromaKeyLut`.
 - **Despill Filter**: `despill` removes key colour contamination specifically on edge pixels between similarity and smoothness thresholds.
 - **Settings Contract**: `ChromaKeySettings` (`similarity`, `smoothness`, `spill`) normalize all controls to the `0..1` range for UI slider binding.
-- **Playback Window & Export**: `VideoTrim` (`start`, `end`) sets the preview and export playback window. Total motion export duration is constrained by `min(trimDuration, templateDuration, 30s)`.
+- **Playback Window & Export**: For user video media, `VideoTrim` (`start`, `end`) sets the preview and export playback window. Total motion export duration is constrained by `min(trimDuration, templateDuration, 30s)`.
 
-## Photo Cutout Mask
+## Photo Template Cutout Mask
 
-User photos support background removal and fine adjustment via an in-memory cutout mask:
+Photo templates support background removal and fine adjustment via an in-memory cutout mask to carve the transparent slot:
 
-- **Mask Format**: `CutoutMask` stores an alpha buffer (`Uint8ClampedArray`) row-major in source-media pixel coordinates (`0` = removed, `255` = kept).
+- **Mask Format**: `CutoutMask` stores an alpha buffer (`Uint8ClampedArray`) row-major in template pixel coordinates (`0` = removed, `255` = kept).
 - **Immutability**: Every mask edit produces a new mask object to keep state transitions explicit.
 - **Domain Operations**:
   - `magicWandErase`: 4-neighbour flood fill erasing contiguous matching regions from a seed coordinate within color tolerance.
   - `autoEraseBackground`: global eraser sampling the outer boundary ring average and clearing all pixels within tolerance across the entire image.
   - `strokeMask`: circular brush stamping along line segments for manual erasing (`keep = false`) or restoring (`keep = true`).
-- **Compositor Integration & Export**: The mask is capped to a 2048 px working resolution for edits and smoothly resampled back to full media size at bake time, and the compositor applies it with destination-in compositing. The resulting alpha mask renders cleanly in both interactive canvas stages and full-resolution PNG exports.
+- **Compositor Integration & Export**: The mask is capped to a 2048 px working resolution for edits and smoothly resampled back to full template size at bake time, and `bakeMaskedTemplate` applies it with destination-in compositing to the template frame. The resulting alpha mask renders cleanly in both interactive canvas stages and full-resolution PNG exports.
 
 ## Cursor Lifecycle, Angle Unwrapping & Opt-Outs
 
@@ -147,6 +147,7 @@ The interface features an interactive paper-plane cursor (`.cursor-plane`):
 - **Loop Halting**: The animation loop halts when pointer movement settles and the rotational delta falls below 0.1 degree, preserving CPU cycles during idle periods.
 - **Idle Float**: When the pointer rests, the cursor transitions into a gentle float rather than disappearing.
 - **Global `cursor: none`**: Native cursors are hidden globally across the viewport while the paper plane is active.
+- **Never Falls Back**: Once the plane is active, `cursor-plane-active` stays on `<html>` until unmount — `pointerleave` and `blur` only hide the plane graphic. The hide rule also covers pseudo-elements (`::-webkit-slider-thumb`, `::-moz-range-thumb`, track and scrollbar), so dragging the zoom slider cannot surface the native cursor.
 - **Canvas Stage & Drag Feedback**: The canvas stage no longer displays native `cursor: grab` or `cursor: grabbing`. Instead, the `.cursor-plane-grabbing` class is applied to the paper plane element for tactile drag feedback.
 
 ### Cursor Opt-Outs

@@ -1,6 +1,6 @@
 # Tweakbon
 
-Tweakbon is a client-side web application that composites a user's photo or video into custom Twibbon template frames. The landing view features a two-pane hero: select or drop a template (PNG with transparency or video) on the left pane, supply personal photo or video media on the right pane, and proceed with an explicit continue action. The editor provides panning, rotation, and zooming from 50% scale (zoom-out) up to 400% before exporting.
+Tweakbon is a client-side web application that composites a user's photo or video into custom Twibbon template frames. The landing view features a two-pane hero: select or drop a template (photo or video, with or without transparency) on the left pane, supply personal photo or video media on the right pane, and proceed with an explicit continue action. The editor provides panning, rotation, and zooming from 50% scale (zoom-out) up to 400% before exporting.
 
 The editor header features a template switcher to replace the active template directly, while photo adjustments and replacement remain in the control panel.
 
@@ -8,8 +8,8 @@ The interface uses a custom paper-plane cursor that tracks pointer position 1:1,
 
 ## Editor Features
 
-- **Chroma key video**: Remove background color from video media using a 32³ LUT with similarity, smoothness, and despill controls.
-- **Photo cutout mask**: Edit photo cutout masks using contiguous magic wand flood fill, manual brush strokes (erase/restore), and automatic edge-color background detection.
+- **Chroma key video template**: Remove background color from video templates using a 32³ LUT with similarity, smoothness, and despill controls to carve out the transparent slot.
+- **Photo template cutout mask**: Edit photo template cutout masks using contiguous magic wand flood fill, manual brush strokes (erase/restore), and automatic edge-color background detection to carve out the transparent slot.
 - **Direct video export**: Record canvas motion and export directly to video based on user trim windows and template duration up to 30 seconds.
 
 Refer to [AGENTS.md](./AGENTS.md) for architecture rules, code conventions, and development guidelines.
@@ -34,12 +34,12 @@ npm run test:watch   # Run Vitest in watch mode
 
 ## Custom Templates
 
-Templates are supplied by the user on the left pane. A template may be a transparent PNG or a video clip:
+Templates are supplied by the user on the left pane. A template may be a photo (PNG, JPG) or video clip, with or without transparency:
 
-- **Still Templates**: The app scans the alpha channel, identifies the largest contiguous transparent region, and derives the slot rectangle from its bounding box.
-- **Video Templates**: The slot is detected once from frame 0 and held constant for the entire duration of the clip. The transparent region in the video must not move relative to the frame; otherwise the slot mask drifts away from the stationary photo beneath.
-- **Video codec**: the container must preserve per-pixel alpha. That means **WebM (VP9)**; H.264/MP4 has no alpha channel, so a "transparent" MP4 loses its hole and is rejected as opaque.
-- **Contiguity**: Stray transparent pixels are ignored; only the largest connected transparent area defines the slot.
+- **Still Templates**: The app scans the alpha channel. When a transparent region is found, it derives the slot rectangle from its bounding box. When the template is opaque, it receives a full-frame slot and the user carves out the transparent slot using the cutout mask editor.
+- **Video Templates**: The slot is detected once from frame 0 and held constant for the entire duration of the clip. If opaque, it receives a full-frame slot and chroma key is enabled to carve out the slot from the video background color.
+- **Video codec**: Transparent formats like WebM (VP9) work directly; opaque MP4/WebM videos are also supported and keyed at runtime via chroma key.
+- **Contiguity**: Stray transparent pixels are ignored; only the largest connected transparent area defines the slot when alpha is present.
 - **Geometry**: Non-rectangular transparent cutouts are approximated by their axis-aligned bounding box.
 
 ## Repository Structure

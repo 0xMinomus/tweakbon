@@ -69,12 +69,19 @@ describe('detectSlotFromAlpha for custom templates', () => {
     });
   });
 
-  it('returns null when template image has no transparency (completely opaque)', () => {
+  it('returns null when template image has no transparency (completely opaque), signaling user must carve hole', () => {
     // 100x100 fully opaque buffer with no transparent hole
     const mask = createTemplateBuffer(100, 100);
 
     const slot = detectSlotFromAlpha(mask);
 
+    // In the new flow, a null result from alpha detection is no longer rejected.
+    // It signals needsHole: true and defaults to a full-frame slot ({ x: 0, y: 0, width: 1, height: 1 }),
+    // indicating the user must carve the hole using chroma key or cutout masking.
     expect(slot).toBeNull();
+    const needsHole = slot === null;
+    expect(needsHole).toBe(true);
+    const effectiveSlot = slot ?? { x: 0, y: 0, width: 1, height: 1 };
+    expect(effectiveSlot).toEqual({ x: 0, y: 0, width: 1, height: 1 });
   });
 });

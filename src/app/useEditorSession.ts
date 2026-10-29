@@ -19,9 +19,10 @@ export interface EditorSession {
   template: TemplateSource | null;
   manifest: TemplateManifest | null;
   transform: TransformState;
-  chroma: ChromaKeySettings;
+  templateChroma: ChromaKeySettings;
+  templateMask: CutoutMask | null;
+  templateNeedsHole: boolean;
   trim: VideoTrim;
-  mask: CutoutMask | null;
   isLoading: boolean;
   error: string | null;
   minScale: number;
@@ -30,9 +31,9 @@ export interface EditorSession {
   setCustomTemplate: (file: File) => Promise<void>;
   clearTemplate: () => void;
   clearMedia: () => void;
-  setChroma: (next: ChromaKeySettings) => void;
+  setTemplateChroma: (next: ChromaKeySettings) => void;
+  setTemplateMask: (next: CutoutMask | null) => void;
   setTrim: (next: VideoTrim) => void;
-  setMask: (next: CutoutMask | null) => void;
   dispatchTransform: (action: TransformAction) => void;
   clearError: () => void;
 }
@@ -42,9 +43,10 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
   const [template, setTemplateState] = useState<TemplateSource | null>(null);
   const [manifest, setManifestState] = useState<TemplateManifest | null>(initialManifest ?? null);
   const [transform, setTransform] = useState<TransformState>(createTransform());
-  const [chroma, setChroma] = useState<ChromaKeySettings>(DEFAULT_CHROMA_KEY);
+  const [templateChroma, setTemplateChroma] = useState<ChromaKeySettings>(DEFAULT_CHROMA_KEY);
+  const [templateMask, setTemplateMask] = useState<CutoutMask | null>(null);
+  const [templateNeedsHole, setTemplateNeedsHole] = useState<boolean>(false);
   const [trim, setTrim] = useState<VideoTrim>({ start: 0, end: 1 });
-  const [mask, setMask] = useState<CutoutMask | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,13 +133,7 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
           mediaRef.current = loadedVideo;
           setMediaState(loadedVideo);
           setTransform(createTransform());
-          setChroma({
-            ...DEFAULT_CHROMA_KEY,
-            enabled: true,
-            color: averageCornerColor(loadedVideo.source),
-          });
           setTrim({ start: 0, end: loadedVideo.duration });
-          setMask(null);
         } else {
           const loadedPhoto = await loadPhotoFile(file);
           if (!isMountedRef.current) {
@@ -152,8 +148,6 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
           mediaRef.current = loadedPhoto;
           setMediaState(loadedPhoto);
           setTransform(createTransform());
-          setMask(null);
-          setChroma(DEFAULT_CHROMA_KEY);
           setTrim({ start: 0, end: 1 });
         }
       } catch (err) {
@@ -189,15 +183,23 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
           customReleaseRef.current();
         }
 
-        const templateSource = custom.template ?? custom.image;
-        if (!templateSource) {
-          throw new Error('Gagal memproses template kustom');
-        }
+        const templateSource = custom.template;
         customReleaseRef.current = custom.release;
         templateRef.current = templateSource;
         setTemplateState(templateSource);
         setManifestState(custom.manifest);
         setTransform(createTransform());
+        setTemplateMask(null);
+        setTemplateNeedsHole(custom.needsHole);
+        if (templateSource.kind === 'video') {
+          setTemplateChroma({
+            ...DEFAULT_CHROMA_KEY,
+            enabled: custom.needsHole,
+            color: averageCornerColor(templateSource.source),
+          });
+        } else {
+          setTemplateChroma(DEFAULT_CHROMA_KEY);
+        }
       } catch (err) {
         if (!isMountedRef.current) return;
         const msg = err instanceof Error ? err.message : 'Gagal memproses template kustom';
@@ -222,6 +224,9 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     }
     setTemplateState(null);
     setManifestState(null);
+    setTemplateChroma(DEFAULT_CHROMA_KEY);
+    setTemplateMask(null);
+    setTemplateNeedsHole(false);
   }, []);
 
   const clearMedia = useCallback(() => {
@@ -230,8 +235,6 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
       mediaRef.current = null;
     }
     setMediaState(null);
-    setMask(null);
-    setChroma(DEFAULT_CHROMA_KEY);
     setTrim({ start: 0, end: 1 });
     setTransform(createTransform());
   }, []);
@@ -241,9 +244,10 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     template,
     manifest,
     transform,
-    chroma,
+    templateChroma,
+    templateMask,
+    templateNeedsHole,
     trim,
-    mask,
     isLoading,
     error,
     minScale: MIN_SCALE,
@@ -252,9 +256,9 @@ export function useEditorSession(initialManifest?: TemplateManifest | null): Edi
     setCustomTemplate,
     clearTemplate,
     clearMedia,
-    setChroma,
+    setTemplateChroma,
+    setTemplateMask,
     setTrim,
-    setMask,
     dispatchTransform,
     clearError,
   };

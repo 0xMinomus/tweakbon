@@ -126,7 +126,7 @@ npm run test:watch   # Vitest, watch
 | `src/features/export/export.ts` | offscreen still render, MediaRecorder motion export |
 | `src/components/CanvasStage.tsx` | DPR canvas, pointer/pinch/keyboard input, rAF loop |
 | `src/types/template.ts` | `TemplateManifest`, `SlotRect`, `Point` |
-| `src/types/media.ts` | `MediaSource`, `TemplateImage` |
+| `src/types/media.ts` | `UserMedia`, `TemplateImage`, `TemplateSource` |
 | `src/types/editor.ts` | `TransformState`, `DrawSize` |
 
 A template manifest is the contract. Fields: `id`, `name`, `kind` (`image` | `video`), `src`, `naturalWidth`, `naturalHeight`, `slot` (`x`, `y`, `width`, `height` in normalized units), optional `slotPolygon` for non-rectangular holes, optional `defaultFit`. Manifests are built at runtime from the user's file; there is no shipped catalog.
@@ -151,7 +151,7 @@ A template manifest is the contract. Fields: `id`, `name`, `kind` (`image` | `vi
 
 ## Working Agreements for AI Assistants
 
-- Read this file and `ORCHESTRATOR.md` before editing.
+- Read this file before editing.
 - Prefer editing existing modules over adding new ones. Do not introduce an abstraction with a single implementation.
 - Never leave `TODO`, placeholder, or stub implementations in a delivered change.
 - Never claim a canvas behavior was verified without running the app.

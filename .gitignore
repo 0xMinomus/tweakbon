@@ -1,10 +1,30 @@
-node_modules
-dist
-coverage
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+*.tsbuildinfo
+
+# Tool caches
+.code-graph/
+.vitest/
+.vite/
+
+# Editor / OS noise
 .DS_Store
+.vscode/
+.idea/
+
+# Local env, logs, scratch
 *.local
 *.log
 .herdr/
 .tmp-downloads/
-.vitest/
+
+# Design references and stray images are not part of the app
 *.jpeg
+
+# Internal agent workflow records: kept on disk, never published
+ORCHESTRATOR.md
+SLICES.md

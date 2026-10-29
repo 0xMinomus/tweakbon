@@ -1,0 +1,56 @@
+name: Feature request
+description: Propose a capability the editor, the compositor, or the exporter is missing.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tweakbon stays intentionally narrow: the editor, the compositor, and the export.
+        Accounts, a template marketplace, and server-side rendering are out of scope by
+        design. Proposals inside that boundary are very welcome.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that the app makes hard or impossible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: What should happen instead? Sketch the interaction, not the implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you tried, or the simpler version of this idea.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Template handling (slot detection, chroma key, cutout)
+        - Media transform and interaction
+        - Export (PNG, video)
+        - Accessibility
+        - Documentation
+        - Developer experience
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This keeps processing client-side; nothing about it requires a server.
+          required: true

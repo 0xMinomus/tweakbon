@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="340" viewBox="0 0 1280 340" role="img" aria-label="Tweakbon — put your photo or video inside any twibbon template, entirely in the browser.">
+  <defs>
+    <pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="1.5" cy="1.5" r="1.6" fill="#000000" opacity="0.16" />
+    </pattern>
+  </defs>
+
+  <rect width="1280" height="340" fill="#FFF8EC" />
+  <rect width="1280" height="340" fill="url(#dots)" />
+
+  <!-- hard shadow, then the board -->
+  <rect x="30" y="30" width="1220" height="284" rx="8" fill="#000000" />
+  <rect x="18" y="18" width="1220" height="284" rx="8" fill="#FFF8EC" stroke="#000000" stroke-width="8" />
+
+  <text x="64" y="132" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="88" font-weight="900" letter-spacing="-3" fill="#000000">TWEAKBON</text>
+
+  <text x="66" y="180" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="23" font-weight="600" fill="#000000">Drop a twibbon frame, drop your photo or video, pan and zoom, export.</text>
+
+  <!-- chips -->
+  <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" letter-spacing="0.6">
+    <rect x="66" y="216" width="200" height="40" rx="4" fill="#F7CB46" stroke="#000000" stroke-width="4" />
+    <text x="83" y="243" fill="#000000">100% IN-BROWSER</text>
+
+    <rect x="282" y="216" width="140" height="40" rx="4" fill="#99E885" stroke="#000000" stroke-width="4" />
+    <text x="299" y="243" fill="#000000">NO UPLOAD</text>
+
+    <rect x="438" y="216" width="166" height="40" rx="4" fill="#C0F7FE" stroke="#000000" stroke-width="4" />
+    <text x="455" y="243" fill="#000000">NO DATABASE</text>
+
+    <rect x="620" y="216" width="152" height="40" rx="4" fill="#FE90E8" stroke="#000000" stroke-width="4" />
+    <text x="637" y="243" fill="#000000">NO ACCOUNT</text>
+  </g>
+
+  <!-- frame artwork: dashed border, sun plate, "hole" -->
+  <g transform="translate(946 64) rotate(4)">
+    <rect x="6" y="6" width="196" height="196" rx="6" fill="#000000" />
+    <rect x="0" y="0" width="196" height="196" rx="6" fill="#FFDCB8" stroke="#000000" stroke-width="6" />
+    <rect x="20" y="20" width="156" height="156" rx="4" fill="none" stroke="#000000" stroke-width="6" stroke-dasharray="14 10" />
+    <rect x="42" y="42" width="112" height="112" rx="4" fill="#F7CB46" stroke="#000000" stroke-width="6" />
+    <rect x="58" y="58" width="80" height="80" rx="3" fill="#FE90E8" stroke="#000000" stroke-width="4" />
+  </g>
+
+  <!-- paper plane -->
+  <g transform="translate(872 214) rotate(-10)">
+    <path d="M0 0 L52 19 L21 29 L15 50 Z" fill="#F7CB46" stroke="#000000" stroke-width="5" stroke-linejoin="round" />
+    <path d="M52 19 L21 29" fill="none" stroke="#000000" stroke-width="5" stroke-linejoin="round" />
+  </g>
+</svg>

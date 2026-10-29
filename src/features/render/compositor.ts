@@ -2,7 +2,7 @@ import type { UserMedia, TemplateSource } from '../../types/media';
 import type { TemplateManifest } from '../../types/template';
 import type { TransformState, CutoutMask, ChromaKeySettings, VideoTrim } from '../../types/editor';
 import { drawSizeInSlot, isUncovered } from '../editor/transform';
-import { bakeMaskedMedia } from './masking';
+import { bakeMaskedTemplate } from './masking';
 import { drawKeyedVideoFrame } from './keying';
 
 export interface FrameInput {
@@ -10,11 +10,11 @@ export interface FrameInput {
   media: UserMedia;
   manifest: TemplateManifest;
   transform: TransformState;
-  /** Foto saja. Objek immutable; diganti (bukan dimutasi) tiap edit. */
-  mask?: CutoutMask | null;
-  /** Video saja. Objek immutable; diganti tiap edit. */
-  chroma?: ChromaKeySettings;
-  /** Video saja. Jendela putar/ekspor, detik. */
+  /** Photo template only. Erased regions become transparent. */
+  templateMask?: CutoutMask | null;
+  /** Video template only. Keyed-out colour becomes transparent. */
+  templateChroma?: ChromaKeySettings;
+  /** Media video only. Playback window in seconds. */
   trim?: VideoTrim;
 }
 
@@ -26,7 +26,7 @@ export function drawFrame(
 ): void {
   if (outputWidth <= 0 || outputHeight <= 0) return;
 
-  const { template, media, manifest, transform, mask, chroma } = input;
+  const { template, media, manifest, transform, templateMask, templateChroma } = input;
 
   ctx.clearRect(0, 0, outputWidth, outputHeight);
 
@@ -81,23 +81,28 @@ export function drawFrame(
     ctx.rotate(transform.rotation);
     ctx.scale(transform.flipX ? -1 : 1, 1);
     if (media.kind === 'photo') {
-      const source = mask ? bakeMaskedMedia(media, mask) : media.source;
-      ctx.drawImage(source, -drawW / 2, -drawH / 2, drawW, drawH);
+      ctx.drawImage(media.source, -drawW / 2, -drawH / 2, drawW, drawH);
     } else if (media.source.readyState >= 2) {
-      if (chroma?.enabled) {
-        drawKeyedVideoFrame(ctx, media.source, chroma, -drawW / 2, -drawH / 2, drawW, drawH);
-      } else {
-        ctx.drawImage(media.source, -drawW / 2, -drawH / 2, drawW, drawH);
-      }
+      ctx.drawImage(media.source, -drawW / 2, -drawH / 2, drawW, drawH);
     }
 
     ctx.restore();
   }
 
-  const isVideoTemplate = template.kind === 'video';
-  const skipTemplate = isVideoTemplate && template.source.readyState < 2;
-
-  if (!skipTemplate) {
-    ctx.drawImage(template.source, 0, 0, outputWidth, outputHeight);
+  if (template.kind === 'video') {
+    if (template.source.readyState < 2) return;
+    if (templateChroma?.enabled) {
+      const keyCap = Math.min(2560, Math.max(outputWidth, outputHeight));
+      drawKeyedVideoFrame(ctx, template.source, templateChroma, 0, 0, outputWidth, outputHeight, keyCap);
+    } else {
+      ctx.drawImage(template.source, 0, 0, outputWidth, outputHeight);
+    }
+  } else {
+    if (templateMask) {
+      const masked = bakeMaskedTemplate(template, templateMask);
+      ctx.drawImage(masked, 0, 0, outputWidth, outputHeight);
+    } else {
+      ctx.drawImage(template.source, 0, 0, outputWidth, outputHeight);
+    }
   }
 }

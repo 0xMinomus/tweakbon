@@ -1,8 +1,8 @@
-import type { PhotoMedia } from '../../types/media';
+import type { TemplateImage } from '../../types/media';
 import type { CutoutMask } from '../../types/editor';
 
 const maskCanvasCache = new WeakMap<CutoutMask, HTMLCanvasElement>();
-const bakedMediaCache = new WeakMap<CutoutMask, HTMLCanvasElement>();
+const bakedCache = new WeakMap<CutoutMask, { source: ImageBitmap; canvas: HTMLCanvasElement }>();
 
 function getMaskCanvas(mask: CutoutMask): HTMLCanvasElement {
   const cached = maskCanvasCache.get(mask);
@@ -35,27 +35,27 @@ function getMaskCanvas(mask: CutoutMask): HTMLCanvasElement {
   return canvas;
 }
 
-export function bakeMaskedMedia(media: PhotoMedia, mask: CutoutMask): HTMLCanvasElement {
-  const cached = bakedMediaCache.get(mask);
-  if (cached) return cached;
+export function bakeMaskedTemplate(template: TemplateImage, mask: CutoutMask): HTMLCanvasElement {
+  const cached = bakedCache.get(mask);
+  if (cached && cached.source === template.source) return cached.canvas;
 
   const canvas = document.createElement('canvas');
-  canvas.width = media.width;
-  canvas.height = media.height;
+  canvas.width = template.width;
+  canvas.height = template.height;
 
   const ctx = canvas.getContext('2d');
   if (!ctx) {
-    throw new Error('Gagal membuat 2D context untuk foto.');
+    throw new Error('Gagal membuat 2D context untuk template.');
   }
 
-  ctx.drawImage(media.source, 0, 0, media.width, media.height);
+  ctx.drawImage(template.source, 0, 0, template.width, template.height);
 
   const maskCanvas = getMaskCanvas(mask);
   ctx.globalCompositeOperation = 'destination-in';
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(maskCanvas, 0, 0, media.width, media.height);
+  ctx.drawImage(maskCanvas, 0, 0, template.width, template.height);
   ctx.globalCompositeOperation = 'source-over';
 
-  bakedMediaCache.set(mask, canvas);
+  bakedCache.set(mask, { source: template.source, canvas });
   return canvas;
 }

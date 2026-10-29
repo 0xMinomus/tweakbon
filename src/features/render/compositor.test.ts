@@ -1,8 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { drawFrame, type FrameInput } from './compositor';
+import { bakeMaskedTemplate } from './masking';
+import { drawKeyedVideoFrame } from './keying';
 import type { PhotoMedia, VideoMedia, TemplateImage, TemplateVideo } from '../../types/media';
 import type { TemplateManifest } from '../../types/template';
-import type { TransformState } from '../../types/editor';
+import type { TransformState, CutoutMask, ChromaKeySettings } from '../../types/editor';
+
+vi.mock('./masking', () => ({
+  bakeMaskedTemplate: vi.fn(),
+}));
+
+vi.mock('./keying', () => ({
+  drawKeyedVideoFrame: vi.fn(),
+  averageCornerColor: vi.fn(),
+}));
 
 interface RecordedCall {
   method: string;
@@ -102,6 +113,10 @@ const defaultTransform: TransformState = {
 };
 
 describe('compositor drawFrame', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('asserts operation order: clear -> clip -> media -> restore -> template last covering full output', () => {
     const ctx = createRecordingContext();
     const input: FrameInput = {
@@ -175,15 +190,148 @@ describe('compositor drawFrame', () => {
     expect(lineToCalls[1].args).toEqual([500, 800]);
   });
 
-  it('skips template draw and still draws photo when video template readyState is 0', () => {
+  it('draws plain photo media with no masking call and no keying call', () => {
     const ctx = createRecordingContext();
-    const fakeVideo = { readyState: 0 } as HTMLVideoElement;
+    const input: FrameInput = {
+      template: baseTemplate,
+      media: baseMedia,
+      manifest: baseManifest,
+      transform: defaultTransform,
+    };
 
+    drawFrame(ctx, input, 500, 500);
+
+    expect(bakeMaskedTemplate).not.toHaveBeenCalled();
+    expect(drawKeyedVideoFrame).not.toHaveBeenCalled();
+
+    const drawCalls = ctx.calls.filter((c) => c.method === 'drawImage');
+    expect(drawCalls).toHaveLength(2);
+    expect(drawCalls[0].args[0]).toBe(fakeMediaSource);
+    expect(drawCalls[1].args).toEqual([fakeTemplateSource, 0, 0, 500, 500]);
+  });
+
+  it('draws the baked masked template exactly once when templateMask is present', () => {
+    const ctx = createRecordingContext();
+    const fakeBakedCanvas = {} as HTMLCanvasElement;
+    vi.mocked(bakeMaskedTemplate).mockReturnValue(fakeBakedCanvas);
+
+    const mask: CutoutMask = {
+      width: 1000,
+      height: 1000,
+      alpha: new Uint8ClampedArray(1000 * 1000),
+    };
+
+    const input: FrameInput = {
+      template: baseTemplate,
+      media: baseMedia,
+      manifest: baseManifest,
+      transform: defaultTransform,
+      templateMask: mask,
+    };
+
+    drawFrame(ctx, input, 500, 500);
+
+    expect(bakeMaskedTemplate).toHaveBeenCalledTimes(1);
+    expect(bakeMaskedTemplate).toHaveBeenCalledWith(baseTemplate, mask);
+
+    const drawCalls = ctx.calls.filter((c) => c.method === 'drawImage');
+    expect(drawCalls).toHaveLength(2);
+    expect(drawCalls[0].args[0]).toBe(fakeMediaSource);
+    expect(drawCalls[1].args).toEqual([fakeBakedCanvas, 0, 0, 500, 500]);
+  });
+
+  it('keys the video template and draws media plain behind it when templateChroma.enabled is true', () => {
+    const ctx = createRecordingContext();
+    const fakeVideo = { readyState: 2 } as HTMLVideoElement;
     const videoTemplate: TemplateVideo = {
       kind: 'video',
       source: fakeVideo,
-      width: 1920,
-      height: 1080,
+      width: 1280,
+      height: 720,
+      release: () => {},
+    };
+
+    const chroma: ChromaKeySettings = {
+      enabled: true,
+      color: { r: 0, g: 255, b: 0 },
+      similarity: 0.4,
+      smoothness: 0.1,
+      spill: 0.2,
+    };
+
+    const input: FrameInput = {
+      template: videoTemplate,
+      media: baseMedia,
+      manifest: baseManifest,
+      transform: defaultTransform,
+      templateChroma: chroma,
+    };
+
+    drawFrame(ctx, input, 800, 600);
+
+    expect(bakeMaskedTemplate).not.toHaveBeenCalled();
+
+    const drawCalls = ctx.calls.filter((c) => c.method === 'drawImage');
+    expect(drawCalls).toHaveLength(1);
+    expect(drawCalls[0].args[0]).toBe(fakeMediaSource);
+
+    expect(drawKeyedVideoFrame).toHaveBeenCalledTimes(1);
+    const expectedKeyCap = Math.min(2560, Math.max(800, 600));
+    expect(drawKeyedVideoFrame).toHaveBeenCalledWith(
+      ctx,
+      fakeVideo,
+      chroma,
+      0,
+      0,
+      800,
+      600,
+      expectedKeyCap,
+    );
+  });
+
+  it('draws raw template when video template has no chroma or chroma is disabled', () => {
+    const ctx = createRecordingContext();
+    const fakeVideo = { readyState: 2 } as HTMLVideoElement;
+    const videoTemplate: TemplateVideo = {
+      kind: 'video',
+      source: fakeVideo,
+      width: 1280,
+      height: 720,
+      release: () => {},
+    };
+
+    const input: FrameInput = {
+      template: videoTemplate,
+      media: baseMedia,
+      manifest: baseManifest,
+      transform: defaultTransform,
+      templateChroma: {
+        enabled: false,
+        color: { r: 0, g: 255, b: 0 },
+        similarity: 0.4,
+        smoothness: 0.1,
+        spill: 0.2,
+      },
+    };
+
+    drawFrame(ctx, input, 400, 400);
+
+    expect(drawKeyedVideoFrame).not.toHaveBeenCalled();
+
+    const drawCalls = ctx.calls.filter((c) => c.method === 'drawImage');
+    expect(drawCalls).toHaveLength(2);
+    expect(drawCalls[0].args[0]).toBe(fakeMediaSource);
+    expect(drawCalls[1].args).toEqual([fakeVideo, 0, 0, 400, 400]);
+  });
+
+  it('draws no template layer when video template readyState is less than 2', () => {
+    const ctx = createRecordingContext();
+    const fakeVideo = { readyState: 1 } as HTMLVideoElement;
+    const videoTemplate: TemplateVideo = {
+      kind: 'video',
+      source: fakeVideo,
+      width: 1280,
+      height: 720,
       release: () => {},
     };
 
@@ -194,25 +342,13 @@ describe('compositor drawFrame', () => {
       transform: defaultTransform,
     };
 
-    drawFrame(ctx, input, 600, 600);
+    drawFrame(ctx, input, 400, 400);
+
+    expect(drawKeyedVideoFrame).not.toHaveBeenCalled();
 
     const drawCalls = ctx.calls.filter((c) => c.method === 'drawImage');
     expect(drawCalls).toHaveLength(1);
     expect(drawCalls[0].args[0]).toBe(fakeMediaSource);
-
-    const methods = ctx.calls.map((c) => c.method);
-    expect(methods).toEqual([
-      'clearRect',
-      'save',
-      'beginPath',
-      'rect',
-      'clip',
-      'translate',
-      'rotate',
-      'scale',
-      'drawImage',
-      'restore',
-    ]);
   });
 
   it('draws both photo and template when video template readyState is 2 or higher', () => {
@@ -351,7 +487,8 @@ describe('compositor drawFrame', () => {
     const hasFill = ctx.calls.some((c) => c.method === 'fillRect' || c.method === 'fill');
     expect(hasFill).toBe(false);
   });
-  it('draws video user media directly when chroma key is not enabled', () => {
+
+  it('draws video user media directly when readyState is 2 or higher', () => {
     const ctx = createRecordingContext();
     const fakeUserVideo = { readyState: 2 } as HTMLVideoElement;
     const videoUserMedia: VideoMedia = {

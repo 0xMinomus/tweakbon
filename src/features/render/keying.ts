@@ -40,6 +40,7 @@ export function drawKeyedVideoFrame(
   dy: number,
   dw: number,
   dh: number,
+  maxSide: number = MAX_VIDEO_SIDE,
 ): void {
   if (typeof video.readyState === 'number' && video.readyState < 2) return;
 
@@ -53,7 +54,7 @@ export function drawKeyedVideoFrame(
   if (!vw || !vh) return;
 
   const maxDim = Math.max(vw, vh);
-  const scale = maxDim > MAX_VIDEO_SIDE ? MAX_VIDEO_SIDE / maxDim : 1;
+  const scale = maxDim > maxSide ? maxSide / maxDim : 1;
   const workW = Math.max(1, Math.round(vw * scale));
   const workH = Math.max(1, Math.round(vh * scale));
 

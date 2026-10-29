@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTemplateManifest, type ManifestInput } from './build-manifest';
+import { FULL_FRAME_SLOT, buildTemplateManifest, type ManifestInput } from './build-manifest';
 
 describe('buildTemplateManifest', () => {
   const baseSlot = { x: 0.2, y: 0.1, width: 0.6, height: 0.7 };
@@ -70,5 +70,16 @@ describe('buildTemplateManifest', () => {
     expect(manifest.naturalWidth).toBe(1920);
     expect(manifest.naturalHeight).toBe(1080);
     expect(manifest.slot).toEqual(customSlot);
+  });
+  it('defaults to FULL_FRAME_SLOT when slot is omitted', () => {
+    const input: ManifestInput = {
+      kind: 'image',
+      width: 1000,
+      height: 1000,
+    };
+
+    const manifest = buildTemplateManifest(input);
+
+    expect(manifest.slot).toEqual(FULL_FRAME_SLOT);
   });
 });

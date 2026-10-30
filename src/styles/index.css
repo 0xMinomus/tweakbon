@@ -381,6 +381,18 @@ html.cursor-plane-active *::-moz-range-track {
 .anim-hero-panes { animation: revealUp 340ms cubic-bezier(0.23, 1, 0.32, 1) 90ms both; }
 .anim-hero-steps { animation: revealUp 340ms cubic-bezier(0.23, 1, 0.32, 1) 160ms both; }
 
+/* ---------- Wordmark ---------- */
+.wordmark {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.hero-wordmark {
+  width: min(520px, 86vw);
+  margin: 0 auto 20px;
+}
+
 /* ---------- Hover motion ---------- */
 .drop-pane {
   transition: transform 160ms ease-out, box-shadow 160ms ease-out, background-color 160ms ease-out;
@@ -418,16 +430,8 @@ html.cursor-plane-active *::-moz-range-track {
   gap: 32px;
 }
 
-.site-footer-logo {
-  display: inline-block;
-  font-size: 26px;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-  background-color: var(--sun);
-  border: 3px solid var(--ink);
-  border-radius: var(--radius);
-  box-shadow: 3px 3px 0 var(--ink);
-  padding: 4px 12px;
+.site-footer-wordmark {
+  width: 176px;
 }
 
 .site-footer-brand p {

@@ -3,6 +3,7 @@ import type { TemplateManifest } from '../types/template';
 import type { UserMedia } from '../types/media';
 import { DropPane } from '../components/DropPane';
 import { Button } from '../components/Button';
+import { Wordmark } from '../components/Wordmark';
 
 export interface HeroProps {
   manifest: TemplateManifest | null;
@@ -231,16 +232,8 @@ export function Hero({
           </span>
         </div>
 
-        <h1
-          style={{
-            fontSize: 'clamp(42px, 8vw, 76px)',
-            fontWeight: 900,
-            lineHeight: 1,
-            letterSpacing: '-0.03em',
-            marginBottom: '16px',
-          }}
-        >
-          TWEAKBON
+        <h1 className="hero-wordmark">
+          <Wordmark className="wordmark" />
         </h1>
 
         <p

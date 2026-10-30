@@ -1,3 +1,5 @@
+import { Wordmark } from './Wordmark';
+
 const linkClass = 'site-footer-link';
 
 const REPO_URL = 'https://github.com/0xMinomus/tweakbon';
@@ -14,7 +16,7 @@ export function SiteFooter() {
     <footer className="site-footer anim-reveal">
       <div className="site-footer-inner">
         <div className="site-footer-brand">
-          <span className="site-footer-logo">TWEAKBON</span>
+          <Wordmark className="wordmark site-footer-wordmark" />
           <p>Pasang fotomu ke template twibbon. Semua diproses di perangkatmu.</p>
         </div>
 
